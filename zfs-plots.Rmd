@@ -1,0 +1,163 @@
+---
+title: "Figures for White et al. 2017"
+author: "Richard White"
+date: "24th January 2017"
+output: html_document
+---
+
+```{r load_libraries, include=FALSE, message=FALSE }
+# checks whether packages are installed and trys to install them if not
+packages <-  c("knitr", "rprojroot", "ggplot2", "pheatmap", "reshape2", 
+               "scales", "GenomicFeatures", "plyr", "RColorBrewer",
+               "cba", "topGO", "grid", "Rgraphviz", "biomaRt", "htmlTable",
+               "DESeq2" )
+for( package in packages ){
+  if(!require( package, character.only = TRUE )){
+    install.packages( package )
+  }
+}
+```
+
+```{r knitr_options, include=FALSE, message=FALSE }
+opts_chunk$set( fig.width=9, fig.height=6, include=FALSE, echo=FALSE  )
+```
+
+```{r set_up_plot_list}
+plotList <- list()
+add_to_plot_list <- function( plotList, plot, filename ){
+  index <- length(plotList) + 1
+  plotList[[index]] <- list( plot = plot, file = filename )
+  return( plotList )
+}
+figNum <- 1
+```
+
+```{r get_root}
+rootPath <- find_root(is_rstudio_project)
+for( dir in c('dataFiles', 'plots') ){
+  dirPath <- file.path( rootPath, dir )
+  if( !dir.exists(dirPath) ){
+    dir.create( dirPath )
+  }
+}
+```
+
+```{r loadData}
+DeseqDataFile <- file.path(rootPath, 'dataFiles', 'DESeq.zfs.rnaseq.grcz10.RData')
+if( file.exists(DeseqDataFile) ){
+  load(DeseqDataFile)
+} else {
+  dataFile <- file.path(rootPath, 'dataFiles', "all.tsv")
+  data <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"")
+  # data contains columns including gene information and then a column of counts for each sample
+  # countData is just the counts columns
+  countData <- data[ , grepl("count", colnames(data) ) ]
+  colnames(countData) <- gsub(".count", "", colnames(countData) )
+
+  # the samples file contains two columns
+  # sample name used for sequencing
+  # condition which in this case is the ZFS stage id for the stage that the sample was collected at
+  sampleFile <- file.path(rootPath, 'samples.txt')
+  sampleData <- read.table(sampleFile, sep="\t", header=TRUE,
+                           col.names = c('zmp_sample_name', 'condition'),
+                           colClasses = c('character', 'factor') )
+  # the stages file contains the mapping from ZFS stage id to stage name
+  # the ZFS id column is labelled condition to match the samples file
+  stageInfoFile <- file.path(rootPath, 'stages.txt')
+  stageInfo <- read.table(stageInfoFile, sep="\t",
+                         col.names = c("condition", "stage") )
+  # order levels of stage by order of ZFS ids
+  stageInfo$stage <- factor( stageInfo$stage,
+    levels = stageInfo$stage[ order(stageInfo$condition) ] )
+  # remove prefixes such and Cleavage and Blastula
+  stageInfo$stage <- gsub(" ", "-", stageInfo$stage) # change spaces to hyphens
+  stageInfo$stageName <- gsub("^.*:", "", stageInfo$stage) # remove prefixes
+
+  # order levels of stageName by order of ZFS ids
+  stageInfo$stageName <- factor( stageInfo$stageName,
+    levels = stageInfo$stageName[ order(stageInfo$condition) ] )
+  # join stage info to sample info
+  # joins on condition (ZFS ids)
+  sampleInfo <- merge(sampleData, stageInfo )
+  # droplevels from stage and stageName and ZFS id
+  sampleInfo <- droplevels(sampleInfo)
+
+  # make new human readable sample names by combining stage name and arbitrary number
+  sampleName <- paste( sampleInfo$stageName, 
+                      rep( seq_len(5), nlevels(sampleInfo$condition ) ), 
+                      sep="-" )
+  # set sample names to be row names of sample info
+  rownames(sampleInfo) <- sampleName
+
+  # order count data in stage order
+  colorder <- sapply( sampleInfo$zmp_sample_name, 
+                      function(x){ which( colnames(countData) == x ) } )
+  countData <- countData[ , colorder ]
+
+  # relabel colnames with sample names
+  colnames(countData) <- rownames(sampleInfo)
+
+  # make DESeq object and do rlog transform
+  dds <- DESeqDataSetFromMatrix(countData, sampleInfo, design = ~ condition)
+  
+  # add metadata
+  featureData <- data[ , !grepl("count", colnames(data) ) ]
+  rownames(featureData) <- featureData$e85.Ensembl.Gene.ID
+  mcols(dds) <- DataFrame(mcols(dds), featureData)
+  
+  dds <- estimateSizeFactors(dds)
+  ddsRlog <- rlogTransformation(dds, blind=TRUE)
+  
+  # save objects to file for reloading
+  save(data, countData, sampleInfo, dds, ddsRlog, file=DeseqDataFile)
+
+}
+```
+
+### Fig. 1b
+
+```{r rnaseq_data}
+# RNA-Seq data
+rnaseqDataFile <- file.path(rootPath, 'junctionseq-qorts-summary-table.txt' )
+rnaseqData <- read.table(file=rnaseqDataFile, sep="\t", header=TRUE)
+# reshape data
+rnaseqData.m <- melt(rnaseqData, id.vars="FIELD", variable.name="sample")
+rnaseqData.m$sampleType <- factor( rep('RNA-Seq', nrow(rnaseqData.m) ),
+                                   levels = c('RNA-Seq', 'DETCT') )
+# load RNASeq sample info
+sampleInfoFile <- '~rw4/sanger/lustre/scratch109/sanger/is1/rnaseq-zfs-stages-grcz10/sampleInfo.tsv'
+sampleInfo <- read.table(file=sampleInfoFile, sep="\t", header=TRUE)
+# reorder levels of stage name and sample name
+sampleInfo$stageName <- gsub("pc", "%", sampleInfo$stageName)
+sampleInfo$sampleName <- gsub("pc", "%", sampleInfo$sampleName)
+sampleInfo$stageName <- factor(sampleInfo$stageName, levels=unique(sampleInfo$stageName))
+sampleInfo$sampleName <- factor(sampleInfo$sampleName, levels=unique(sampleInfo$sampleName))
+
+# merge molten data and sample info
+rnaseqData.stage.m <- merge(rnaseqData.m, sampleInfo)
+```
+
+```{r DETCT_data}
+# DETCT data
+detctReadDataFile <- '~/sanger/lustre/scratch109/sanger/is1/detct-grcz10/zfs/filter-keep-simple-keep-no-rnaseq/zfs-detct.read-pairs-mapped.tsv'
+detctReadData <- read.table(file=detctReadDataFile, sep="\t", header=FALSE)
+colnames(detctReadData) <- c('sample', 'value')
+detctReadData$sampleType <- factor( rep('DETCT', nrow(detctReadData) ),
+                                   levels = c('RNA-Seq', 'DETCT') )
+
+# sample info
+detctSampleInfoFile <- '~/sanger/lustre/scratch109/sanger/is1/detct-grcz10/zfs/filter-keep-simple-keep-no-rnaseq/sampleInfo.tsv'
+detctSampleInfo <- read.table(file=detctSampleInfoFile, sep="\t", header=TRUE)
+# reorder levels of stage name and sample name
+detctSampleInfo$stageName <- factor(detctSampleInfo$stageName, levels=unique(detctSampleInfo$stageName))
+detctSampleInfo$sampleName <- factor(detctSampleInfo$sampleName, levels=unique(detctSampleInfo$sampleName))
+
+detctReadDataMerged <- merge(detctReadData, detctSampleInfo)
+```
+
+
+```{r sampleCorrelationMatrix}
+# create sample correlation matrix
+sampleCor <- cor(counts(dds, normalized=TRUE))
+
+```
