@@ -34,7 +34,7 @@ figNum <- 1
 
 ```{r get_root}
 rootPath <- find_root(is_rstudio_project)
-for( dir in c('dataFiles', 'plots') ){
+for( dir in c('plots') ){
   dirPath <- file.path( rootPath, dir )
   if( !dir.exists(dirPath) ){
     dir.create( dirPath )
@@ -116,30 +116,40 @@ if( file.exists(DeseqDataFile) ){
 
 ### Fig. 1b
 
-```{r rnaseq_data}
+```{r load_qorts_rnaseq_data}
+# the data on Mapped reads comes from the QoRTs package and is present in summary table file
+# the READ_PAIR_OK category are read pairs that are properly paired and uniquely mapped
+
 # RNA-Seq data
-rnaseqDataFile <- file.path(rootPath, 'junctionseq-qorts-summary-table.txt' )
-rnaseqData <- read.table(file=rnaseqDataFile, sep="\t", header=TRUE)
+rnaseqQortsDataFile <- file.path(rootPath, 'dataFiles', 'qorts-summary-table.txt' )
+rnaseqQortsData <- read.table(file=rnaseqQortsDataFile, sep="\t", header=TRUE)
+# subset to READ_PAIR_OK
+rnaseqQortsData <- rnaseqQortsData[ rnaseqQortsData$FIELD == "READ_PAIR_OK", ]
 # reshape data
-rnaseqData.m <- melt(rnaseqData, id.vars="FIELD", variable.name="sample")
-rnaseqData.m$sampleType <- factor( rep('RNA-Seq', nrow(rnaseqData.m) ),
+rnaseqQortsData.m <- melt(rnaseqQortsData, id.vars="FIELD", variable.name="sample")
+# subset to READ_PAIR_OK
+rnaseqQortsData.m$sampleType <- factor( rep('RNA-Seq', nrow(rnaseqQortsData.m) ),
                                    levels = c('RNA-Seq', 'DETCT') )
-# load RNASeq sample info
-sampleInfoFile <- '~rw4/sanger/lustre/scratch109/sanger/is1/rnaseq-zfs-stages-grcz10/sampleInfo.tsv'
-sampleInfo <- read.table(file=sampleInfoFile, sep="\t", header=TRUE)
-# reorder levels of stage name and sample name
-sampleInfo$stageName <- gsub("pc", "%", sampleInfo$stageName)
-sampleInfo$sampleName <- gsub("pc", "%", sampleInfo$sampleName)
-sampleInfo$stageName <- factor(sampleInfo$stageName, levels=unique(sampleInfo$stageName))
-sampleInfo$sampleName <- factor(sampleInfo$sampleName, levels=unique(sampleInfo$sampleName))
 
 # merge molten data and sample info
-rnaseqData.stage.m <- merge(rnaseqData.m, sampleInfo)
+rnaseqQortsData.stage.m <- merge(rnaseqQortsData.m, sampleInfo, by.x = "sample", by.y = "zmp_sample_name")
+
+
+
+# rnaseqRPData <- data.frame(
+#   sample = rnaseqData.stage.m$sample[ rows ],
+#   sampleType = rnaseqData.stage.m$sampleType[ rows ],
+#   stageName = rnaseqData.stage.m$stageName[ rows ],
+#   value = rnaseqData.stage.m$value[ rows ]
+# )
+
 ```
 
 ```{r DETCT_data}
 # DETCT data
-detctReadDataFile <- '~/sanger/lustre/scratch109/sanger/is1/detct-grcz10/zfs/filter-keep-simple-keep-no-rnaseq/zfs-detct.read-pairs-mapped.tsv'
+# This data comes from running samtools flagstat on each bam file and then selecting the entry for properly paired reads
+# e.g. grep properly $sample.markdup.flagstat.txt | awk '{ print "'$sample'", $1 }'
+detctReadDataFile <- file.path(rootPath, 'dataFiles', 'zfs-detct.read-pairs-mapped.tsv' )
 detctReadData <- read.table(file=detctReadDataFile, sep="\t", header=FALSE)
 colnames(detctReadData) <- c('sample', 'value')
 detctReadData$sampleType <- factor( rep('DETCT', nrow(detctReadData) ),
@@ -155,9 +165,466 @@ detctSampleInfo$sampleName <- factor(detctSampleInfo$sampleName, levels=unique(d
 detctReadDataMerged <- merge(detctReadData, detctSampleInfo)
 ```
 
+### Fig 1c
 
-```{r sampleCorrelationMatrix}
+#### Genes detected
+
+```{r genes_detected}
+# countThreshold <- 5
+for( countThreshold in c(0.000001,1,2,5,10) ){
+  totalGenesDetected <- sum( apply(counts(dds, normalized=TRUE), 1, 
+                                   function(row){ sum( row >= countThreshold ) > 0 } ) )
+  genesDetectedByStage <- apply(counts(dds, normalized=TRUE), 2, function(col){ sum(col >= countThreshold) } )
+  genesDetected.m <- melt(genesDetectedByStage)
+  
+  genesDetected <- data.frame(
+    sampleName = rownames(genesDetected.m),
+    sampleType = rep('RNA-Seq', nrow(genesDetected.m)),
+    genes = genesDetected.m$value
+  )
+  
+}
+```
+
+### Fig 1d
+
+#### Sample Correlation Matrix
+
+```{r fig1d, include=TRUE}
 # create sample correlation matrix
 sampleCor <- cor(counts(dds, normalized=TRUE))
 
+# melt for ggplot
+sampleCor.m <- melt(sampleCor)
+# reverse levels of y axis variable so that it plots sensibly
+sampleCor.m$Var2 <- factor( sampleCor.m$Var2,
+                            levels = rev(levels(sampleCor.m$Var2))
+  )
+# plot correlation matrix
+sampleCorHeatmap <- ggplot(data = sampleCor.m) + 
+  geom_tile( aes( x = Var1, y = Var2, fill = value ),
+               colour = "grey60" ) + 
+  scale_fill_gradientn( colours = c("blue", "yellow", "red"),
+                        guide = guide_colorbar(title = "Correlation\nCoefficient\n(Pearson)") ) + 
+  theme_void() + theme( legend.position="right",
+                        legend.title = element_text(colour="black" ) )
+
+
+plotList <- add_to_plot_list( plotList, 
+                              sampleCorHeatmap, file.path(rootPath, 'plots', 'fig.1d.pdf') )
+
+print(sampleCorHeatmap)
+```
+
+### Fig 1e-h
+
+#### PCA
+
+```{r pca}
+varPCThreshold <- 1
+varRegionThreshold <- 0.01
+sampleNames <- FALSE
+
+# function to plot arbitrary PCs against each other
+PCA_plot <- function( pca, propVarPC, firstPC, secondPC = NULL, DESeqTrans, sampleNames = NULL ){
+  secondPC <- ifelse(is.null(secondPC), firstPC + 1, secondPC )
+  # make a data frame for plotting from
+  d <- data.frame(first=pca$x[,firstPC], second=pca$x[,secondPC],
+                  Stage=colData(DESeqTrans)$stageName )
+  if( !is.null( sampleNames ) ){
+    d$name <- sampleNames
+  }
+  # choose plot colours
+  numLevels <- nlevels(d$Stage)
+  ord1 <- seq(1,numLevels,2)
+  ord2 <- seq(2,numLevels,2)
+  colourPalette <- hue_pal()(numLevels)[ order(c(ord1,ord2)) ]
+  pcaPlot <- ggplot(data=d) +
+    geom_point( aes(x=first, y=second, colour=Stage) ) + 
+    scale_colour_manual( values = colourPalette ) + 
+    xlab(paste0("PC", firstPC, ": ", round(propVarPC[firstPC] * 100, 1),
+                "% variance")) +
+    ylab(paste0("PC", secondPC, ": ", round(propVarPC[secondPC] * 100, 1),
+                "% variance")) + theme_minimal()
+  
+  if( !is.null( sampleNames ) ) {
+    pcaPlot <- pcaPlot +
+      geom_text(aes(label=sampleNames),
+                hjust=0, vjust=0, size=4,
+                show_guide=FALSE)
+  }
+  return(pcaPlot)
+}
+
+runPCA <- function( data, DESeqTransObj, regionCount ){
+  # run PCA on transformed data (DESeq2 Rlog or VST transforms)
+  rv <- rowVars(assay(DESeqTransObj))
+  # subset data to top regionCount most variable genes/regions
+  select <- order(rv, decreasing=TRUE)[seq_len(min(regionCount, length(rv)))]
+  pca <- prcomp(t(assay(DESeqTransObj)[select,]))
+  # calculate the proportion of variance explained by each PC
+  propVarPC <- pca$sdev^2 / sum( pca$sdev^2 )
+  # calculate the proportion of variance contributed by each gene/region
+  aload <- abs(pca$rotation)
+  propVarRegion <- sweep(aload, 2, colSums(aload), "/")
+
+  # Output regions contributing most to each PC
+  genesForPCsList <- vector('list', length = sum(propVarPC * 100 >= varPCThreshold))
+  for (i in seq.int(sum(propVarPC * 100 >= varPCThreshold))) {
+      data[select, "% variance explained"] <- propVarRegion[,i] * 100
+      topData <- data[order(data$`% variance explained`, decreasing=TRUE),]
+      topData <- topData[ topData[["% variance explained"]] >= varRegionThreshold, ]
+      genesForPCsList[[i]] <- topData
+      write.table( topData, file=file.path(rootPath, 'pca',
+                                           paste0(outputBase, "-PC", i, ".tsv") ),
+          row.names=FALSE, quote=FALSE, sep="\t" )
+  }
+
+  # # Write PCs to PDF
+  # plotList <- vector( "list", length = sum(propVarPC * 100 >= varPCThreshold) + 1 )
+  # pdf(pdfFile)
+  # 
+  # # Show variance explained for each PC
+  # d <- data.frame(PC=seq.int(length(propVarPC)), var=propVarPC)
+  # varPlot1 <- ggplot(data=d, aes(x=PC, y=var)) + geom_line() + geom_point() +
+  #                 xlab("PC") + ylab("Variance explained") + ylim(c(0, 1))
+  # print(varPlot1)
+  # plotList[[1]] <- varPlot1
+  # varPlot2 <- ggplot(data=d, aes(x=PC, y=cumsum(var))) + geom_line() + geom_point() +
+  #     xlab("PC") + ylab("Cumulative variance explained") + ylim(c(0, 1))
+  # print(varPlot2)
+  # plotList[[2]] <- varPlot2
+  
+  # Plot PCs in pairs
+  # short_sample_names <- remove_common_prefix(colnames(DESeqTransObj))
+  plotList <- vector( "list", length = sum(propVarPC * 100 >= varPCThreshold) + 1 )
+  for (i in seq.int(sum(propVarPC * 100 >= varPCThreshold) - 1)) {
+      first <- i
+      second <- i + 1
+      pcaPlot <- PCA_plot( pca, propVarPC, first, second, 
+                           DESeqTransObj, sampleNames = NULL )
+      plotList[[i]] <- pcaPlot
+  }
+  
+  # graphics.off()
+  return( 
+    list(
+      pca = pca,
+      plots = plotList,
+      PCData = genesForPCsList
+    )
+  )
+}
+```
+
+```{r pca_all_regions}
+regionCount <- nrow(data)
+pcaObj <- runPCA( data, ddsRlog, regionCount )
+pcaPlotList <- pcaObj$plots
+
+```
+
+### PCA Plots (using all genes)
+
+```{r pcs1_3_plots}
+# fig.1e PC1 against 2
+PlotFile <- file.path(rootPath, 'pca', paste0(outputBase, ".pca.PCs1-2.ps") )
+postscript(file=PlotFile, paper="special", width = 6, height = 6)
+print( pcaPlotList[[3]] + theme( legend.position = "none" ) )
+dev.off()
+
+# fig.1f PC1 against 3, with legend
+PlotFile <- file.path(rootPath, 'pca', paste0(outputBase, ".pca.PCs2-3.legend.ps") )
+postscript(file=PlotFile, paper="special", width = 8, height = 6)
+print( pc1_pc3Plot )
+dev.off()
+```
+
+
+# Figure 1-1
+PCA
+```{r exprPlotFunctions}
+clusterGenes <- function( counts ){
+  distMatrix <- as.dist( 1 - abs( cor(t(counts)) ) )
+  # cluster and reorder correlation matrix
+  hClust <- hclust(distMatrix)
+  # find optimal ordering of leaves
+  optOrder <- order.optimal(distMatrix, hClust$merge)
+  # new ordering
+  newClust <- hClust
+  newClust$merge <- optOrder$merge
+  newClust$order <- optOrder$order
+  # order genes by optimal ordering
+  counts <- counts[ newClust$order, ]
+}
+
+exprHeatmap <- function( PCNum, PCDataList, numGenes = 100, cluster = TRUE ){
+  dataForPC <- PCDataList[[PCNum]]
+  counts <- log10( dataForPC[ seq_len(numGenes), grepl("count", colnames(dataForPC) ) ] + 1 )
+  rownames(counts) <- dataForPC[ seq_len(numGenes), 'e85.Ensembl.Gene.ID']
+  if( cluster ){
+    counts <- clusterGenes( counts )
+  }
+  
+  counts.m <- cbind(
+    gene_id = factor( rownames(counts),
+                      levels = rownames(counts) ),
+    suppressMessages(
+      melt( counts, variable.name = "sample")
+    )
+  )
+  Heatmap <- ggplot(data = counts.m) + 
+    geom_raster( aes( x = sample, y = gene_id, fill = value ) ) + 
+    scale_fill_gradientn( colours = c("blue", "yellow", "red"),
+                          guide = guide_colorbar(title = "log10 counts") ) + 
+    theme_void() + theme( legend.position="right",
+                          legend.title = element_text(colour="black" ) )
+  return(Heatmap)
+}
+```
+
+```{r pcaMatrixPlot}
+PCA_matrixPlot <- function( PCDataList, pca, ddsRlog, ... ){
+  matrixPlotList <- vector( "list", length = length(PCDataList) * length(PCDataList) )
+  propVarPC <- pca$sdev^2 / sum( pca$sdev^2 )
+  # loop through PCs ( ones above varPCThreshold )
+  for( firstPC in seq_len( length(PCDataList) ) ){
+    for( secondPC in seq_len( length(PCDataList) ) ){
+      # if firstPC == secondPC, plot expression heatmap
+      # else plot firstPC against second PC
+      if( firstPC == secondPC ){
+        plot <- exprHeatmap( firstPC, PCDataList, ... )
+        plot <- plot + theme( legend.position="none" )
+      } else if( firstPC > secondPC ){
+        # blank plot
+        plot <- ggplot( data = data.frame() ) + geom_blank() + theme_void()
+      } else{
+        plot <- PCA_plot( pca, propVarPC, firstPC, secondPC, ddsRlog )
+        plot <- plot + 
+          guides(colour = "none") + 
+          theme( axis.title = element_blank(),
+                 axis.text = element_blank(),
+                 axis.ticks = element_blank() )
+      }
+      matrixPlotList[[ length(PCDataList)*(secondPC-1) + firstPC ]] <- plot
+    }
+  }
+  return(matrixPlotList)
+}
+
+pca <- pcaObj$pca
+PCDataList <- pcaObj$PCData
+matrixPlotList <- PCA_matrixPlot( PCDataList, pca, ddsRlog, numGenes = 100 )
+
+# save as both pdf and eps
+matrixFile <- file.path(rootPath, 'pca', paste0( outputBase, '.pca-matrix.eps') )
+ggsave(matrixFile, width = 20, height = 20, marrangeGrob(matrixPlotList, nrow = 6, ncol = 6) )
+```
+
+## Figure 3
+### Fig3A
+#### Max Stage Clusters TPM heatmap
+
+```{r seqinfo}
+# This relies on having this file
+# NEED TO FIGURE OUT A WAY TO DO THIS USING BIOMART OR ENSEMBL OR UCSC OR SOMETHING
+# THIS IS ONLY NEEDED IF THE TXDB DOESN'T ALREADY EXIST
+```
+
+```{bash}
+# To calculate TPM, we need the length of each transcript.
+# This needs a tab-separated file of transcript ids and lengths
+# If that is not present the script tries to get it from either a TxDb file
+# or it downloads gtf and fasta files from Ensembl
+
+# check whether the gtf file exists
+ensVersion='85'
+transcriptsFile="Danio_rerio.e$ensVersion.transcript.lengths.tsv"
+
+TxDbFile="Danio_rerio.GRCz10.$ensVersion.db"
+
+gtfFile="Danio_rerio.GRCz10.$ensVersion.gtf"
+gtfLink="ftp://ftp.ensembl.org/pub/release-$ensVersion/gtf/danio_rerio/$gtfFile.gz"
+
+fastaFile="Danio_rerio.GRCz10.dna.toplevel.fa"
+fastaFileLink="ftp://ftp.ensembl.org/pub/release-$ensVersion/fasta/danio_rerio/dna/$fastaFile.gz"
+
+# check for transcripts file
+if[[ ! -e $transcriptsFile ]]
+then
+  if [[ ! -e $TxDbFile ]]
+  then 
+    if[[ ! -e $gtfFile ]]
+    then
+      # download and unzip GTF file
+      curl -O $gtfLink
+      gunzip $gtfFile.gz
+      # download and index genome fasta file to get chromosome lengths
+      curl -O $fastaFileLink
+      gunzip $fastaFile.gz
+      samtools faidx $fastaFile
+    fi
+  fi
+fi
+```
+
+```{r getTranscriptInfo}
+# check for the existence of Transcript info
+ensVersion <- '85'
+TranscriptsFile <- file.path(rootPath, 'dataFiles', paste0('Danio_rerio.e', ensVersion, '.transcript.lengths.tsv') )
+
+if( file.exists(TranscriptsFile) ){
+  TxInfo <- read.table(file=TranscriptsFile, sep="\t", row.names = 1)
+  TxLengths <- TxInfo[[1]]
+  names(TxLengths) <- rownames(TxInfo)
+} else{
+  # check for the existence of TxDb file
+  TxDbFile <- file.path(rootPath,  paste0('Danio_rerio.GRCz10.', ensVersion, '.db') )
+  if( file.exists( TxDbFile ) ){
+    txdb <- loadDb( TxDbFile )
+  } else {
+    # need to get chr lengths from genome index file
+    fastaIndexFile <- 'Danio_rerio.GRCz10.dna.toplevel.fa.fai'
+    faidx <- read.table(file=fastaIndexFile, sep="\t", 
+                        colClasses=c("character", "integer", "integer", "integer", "integer"))
+    names(faidx) <- c("Chr", "Length", "Idx", "LineLength", "LineLength2")
+    GRCz10Chrs <- Seqinfo( seqnames=faidx$Chr, seqlengths=faidx$Length )
+
+    # make TxDb from GFF file
+    gtfFile <- file.path(rootPath, paste0('Danio_rerio.GRCz10.', ensVersion, '.gtf') )
+    txdb <- makeTxDbFromGFF(
+      gtfFile, format="gtf",
+      dataSource = "Ensembl",
+      organism = "Danio rerio",
+      taxonomyId = 7955,
+      chrominfo = GRCz10Chrs
+    )
+    # save to db file
+    saveDb( txdb, TxDbFile )
+  }
+  # calculate lengths of transcripts
+  exonsByGene <- exonsBy(txdb, by="gene")
+  TxLengths <- sapply(exonsByGene, 
+                      function( gene ){ sum( width( reduce(unlist(gene)) ) ) }
+  )
+  write.table(TxLengths, file=TranscriptsFile, 
+              row.names=TRUE, sep="\t", quote=FALSE, col.names = FALSE)
+}
+
+```
+
+```{r getInsertSizes}
+# get InsertSize_Mean from junctionseq/qorts/pdfs/summary.table.txt
+qortsSummaryFile <- file.path(rootPath, 'junctionseq', 'qorts', 'pdfs', 'summary.table.txt')
+qortsSummary <- read.table(qortsSummaryFile, sep="\t", 
+                           header=TRUE, row.names = 1 )
+insertSizes <- unlist(qortsSummary["InsertSize_Mean",])
+
+# match up sample names
+names(insertSizes) <- sapply(names(insertSizes), 
+ function(sample){ rownames(sampleInfo)[ sampleInfo$zmp_sample_name == sample ] } 
+)
+insertSizes <- insertSizes[ rownames(colData(dds)) ]
+```
+
+```{r countsToTpm}
+#' This function is from https://gist.github.com/slowkow/c6ab0348747f86e2748b#file-counts_to_tpm-r
+#' Convert counts to transcripts per million (TPM).
+#' 
+#' Convert a numeric matrix of features (rows) and conditions (columns) with
+#' raw feature counts to transcripts per million.
+#' 
+#'    Lior Pachter. Models for transcript quantification from RNA-Seq.
+#'    arXiv:1104.3889v2 
+#'    
+#'    Wagner, et al. Measurement of mRNA abundance using RNA-seq data:
+#'    RPKM measure is inconsistent among samples. Theory Biosci. 24 July 2012.
+#'    doi:10.1007/s12064-012-0162-3
+#'    
+#' @param counts A numeric matrix of raw feature counts i.e.
+#'  fragments assigned to each gene.
+#' @param featureLength A numeric vector with feature lengths.
+#' @param meanFragmentLength A numeric vector with mean fragment lengths.
+#' @return tpm A numeric matrix normalized by library size and feature length
+counts_to_tpm <- function(counts, featureLength, meanFragmentLength) {
+  
+  # Ensure valid arguments.
+  stopifnot(length(featureLength) == nrow(counts))
+  stopifnot(length(meanFragmentLength) == ncol(counts))
+  
+  # Compute effective lengths of features in each library.
+  effLen <- do.call(cbind, lapply(1:ncol(counts), function(i) {
+    featureLength - meanFragmentLength[i] + 1
+  }))
+  
+  # Exclude genes with length less than the mean fragment length.
+  idx <- apply(effLen, 1, function(x) min(x) > 1)
+  counts <- counts[idx,]
+  effLen <- effLen[idx,]
+  featureLength <- featureLength[idx]
+  
+  # Process one column at a time.
+  tpm <- do.call(cbind, lapply(1:ncol(counts), function(i) {
+    rate = log(counts[,i]) - log(effLen[,i])
+    denom = log(sum(exp(rate)))
+    exp(rate - denom + log(1e6))
+  }))
+
+  # Copy the column names from the original matrix.
+  colnames(tpm) <- colnames(counts)
+  return(tpm)
+}
+```
+
+```{r createTpm}
+tpm <- counts_to_tpm(counts(dds), TxLengths, insertSizes)
+```
+
+
+#### Named vs Unnamed genes
+
+#### ZFA enrichment
+
+#### GO enrichment
+
+### Figure 3-1
+
+#### Orthologues of Named/Unnamed genes
+
+## Figure 4 (ZnF.Rmd)
+
+### Fig4A
+#### Cluster4,22,37,84 tpm heatmap
+### Fig4C - NLR genes tpm heatmap
+### Fig4D - Chr22 Znf genes tpm heatmap
+### Fig4E - Chr4 tpm heatmap
+### Fig4F-G - histograms of ZnF/NLR genes on chr 4
+
+### Figure 4-2
+#### histograms of ZnF genes on chr 4, split by cluster
+
+### Figure 4-3
+#### Regional expression
+
+## Figure 5
+### Fig5A
+#### Pearson histogram (Paralogues)
+### Fig5B
+#### Pearson histogram (random sample)
+### Fig5C
+#### top10/bottom10 tpm heatmap
+### Fig5D-G
+#### scatterplots/point based expression profiles
+
+
+```{r print_plots_to_file }
+for( plotInfo in plotList ){
+  pdf(file=plotInfo$file)
+  print(plotInfo$plot)
+  dev.off()
+}
+```
+
+```{r sessionInfo, echo=FALSE, results='markup'}
+sessionInfo()
 ```
