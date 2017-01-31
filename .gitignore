@@ -1,3 +1,10 @@
 .R*
 *DESeq.zfs.*.grcz10.RData
 plots/*
+.Rproj.user
+Danio_rerio.*
+ZF-Paralogues.pearson.tsv
+e85.maxStageClusters.gene_counts.tsv
+dataFiles/one-to-one-paralogues*
+dataFiles/AllGenes.85.biomart.tsv
+dataFiles/rnaseq/chr4_ZnF.uniq.txt
