@@ -1,0 +1,253 @@
+Stage	ZFATerm	p	p.adjusted	name	TotalInCluster	Significant	Expected	Germlayer	Tissue
+50%-epiboly	ZFA:0000004	1.57215485759191e-06	0.00139450135868402	"anterior axial hypoblast"	118	15	4.58	mesoderm	"hatching gland"
+14-19-somites	ZFA:0000006	1.17014461997305e-05	0.00923244105158737	"ball"	58	10	1.38	yolk-derived	"yolk ball/extension"
+Prim-25	ZFA:0000008	2.63862782177388e-07	0.000300803571682222	"brain"	2929	99	77.09	ectoderm	neural
+Protruding-mouth	ZFA:0000008	7.69868992183779e-12	9.75424013096848e-09	"brain"	2929	206	204.70	ectoderm	neural
+Prim-25	ZFA:0000012	1.95122926150659e-08	2.22440135811751e-05	"central nervous system"	1346	74	35.43	ectoderm	neural
+Protruding-mouth	ZFA:0000012	1.37295553399771e-12	1.7395346615751e-09	"central nervous system"	1346	119	94.07	ectoderm	neural
+Prim-25	ZFA:0000013	5.30452546912438e-07	0.000604715903480179	"cranial ganglion"	443	33	11.66	ectoderm	"neural crest"
+Protruding-mouth	ZFA:0000013	1.02552089134009e-21	1.2993349693279e-18	"cranial ganglion"	443	85	30.96	ectoderm	"neural crest"
+Day-5	ZFA:0000019	5.60547601328821e-06	0.0069395793044508	"epiphysis"	578	105	83.78	ectoderm	neural
+Protruding-mouth	ZFA:0000019	3.59354033722019e-13	4.55301560725798e-10	"epiphysis"	578	92	40.39	ectoderm	neural
+20-25-somites	ZFA:0000022	2.35644792358726e-09	2.28575448587964e-06	"floor plate"	286	29	8.11	ectoderm	neural
+Day-5	ZFA:0000024	2.7246053550436e-06	0.00337306142954398	"retinal ganglion cell layer"	510	107	73.92	ectoderm	neural
+Protruding-mouth	ZFA:0000024	3.77115731128936e-12	4.77805631340362e-09	"retinal ganglion cell layer"	510	85	35.64	ectoderm	neural
+Long-pec	ZFA:0000029	3.21544769136984e-08	3.57557783280326e-05	"hindbrain"	1756	92	45.93	ectoderm	neural
+Prim-25	ZFA:0000029	9.70309139455447e-15	1.10615241897921e-11	"hindbrain"	1756	101	46.22	ectoderm	neural
+Protruding-mouth	ZFA:0000029	1.16057859718703e-06	0.00147045308263597	"hindbrain"	1756	163	122.72	ectoderm	neural
+Day-5	ZFA:0000032	6.31311621980732e-06	0.00781563788012147	"hypothalamus"	376	68	54.50	ectoderm	neural
+Day-5	ZFA:0000037	2.96724856857666e-30	3.67345372789791e-27	"anatomical structure"	295	44	42.76	NULL	NULL
+Long-pec	ZFA:0000037	3.71064454194929e-09	4.12623673064761e-06	"anatomical structure"	295	8	7.72	NULL	NULL
+Protruding-mouth	ZFA:0000037	2.95648583944533e-12	3.74586755857723e-09	"anatomical structure"	295	22	20.62	NULL	NULL
+1-4-somites	ZFA:0000041	1.24016034928116e-09	1.48695225878811e-06	"mesoderm"	341	56	18.75	mesoderm	NULL
+Prim-5	ZFA:0000041	1.16992695058986e-05	0.0125299176408174	"mesoderm"	341	21	11.27	mesoderm	NULL
+1-4-somites	ZFA:0000045	3.50420954949282e-06	0.00420154724984189	"neural crest"	227	20	12.48	ectoderm	"neural crest"
+Protruding-mouth	ZFA:0000046	1.49270135516936e-21	1.89125261699958e-18	"retinal neural layer"	82	7	5.73	ectoderm	neural
+Protruding-mouth	ZFA:0000050	5.26939165144293e-10	6.67631922237819e-07	"optic vesicle"	488	38	34.10	ectoderm	neural
+50%-epiboly	ZFA:0000060	1.4560311254065e-06	0.00129149960823556	"prechordal plate"	96	14	3.73	mesoderm	"hatching gland"
+Prim-25	ZFA:0000062	6.68924444624918e-06	0.00762573866872407	"presumptive forebrain"	7	1	0.18	ectoderm	neural
+1-4-somites	ZFA:0000071	1.80019396749951e-09	2.15843256703192e-06	"shield"	118	17	6.49	mesoderm	organizer
+50%-epiboly	ZFA:0000071	2.90033897984114e-07	0.000257260067511909	"shield"	118	18	4.58	mesoderm	organizer
+20-25-somites	ZFA:0000075	2.88864090750561e-08	2.80198168028044e-05	"spinal cord"	1319	73	37.42	ectoderm	neural
+Prim-25	ZFA:0000075	4.25211658003415e-16	4.84741290123893e-13	"spinal cord"	1319	87	34.72	ectoderm	neural
+1-4-somites	ZFA:0000077	9.65855757456576e-06	0.0115806105319043	"tail bud"	598	82	32.88	NULL	NULL
+Day-5	ZFA:0000079	2.14542130781742e-13	2.65603157907797e-10	"telencephalon"	1004	174	145.53	ectoderm	neural
+Long-pec	ZFA:0000079	3.09919528697919e-06	0.00344630515912085	"telencephalon"	1004	60	26.26	ectoderm	neural
+Prim-25	ZFA:0000079	6.38552646370729e-10	7.27950016862631e-07	"telencephalon"	1004	61	26.43	ectoderm	neural
+Protruding-mouth	ZFA:0000079	1.85144601266198e-13	2.34578209804273e-10	"telencephalon"	1004	125	70.17	ectoderm	neural
+1-4-somites	ZFA:0000081	1.10462406402343e-14	1.3244442527641e-11	"trunk mesenchyme"	9	1	0.49	mesoderm	mesenchyme
+Prim-5	ZFA:0000081	1.11603104771127e-05	0.0119526925209877	"trunk mesenchyme"	9	1	0.30	mesoderm	mesenchyme
+75%-epiboly	ZFA:0000084	2.5906911289744e-10	2.79794641929235e-07	"yolk"	295	26	14.75	yolk-derived	yolk
+Shield	ZFA:0000084	4.11180829102862e-05	0.0383220532723867	"yolk"	295	18	11.88	yolk-derived	yolk
+50%-epiboly	ZFA:0000086	1.44582378235406e-07	0.000128244569494805	"EVL"	210	25	8.16	ectoderm	epidermis
+75%-epiboly	ZFA:0000086	2.29254384796551e-12	2.47594735580275e-09	"EVL"	210	36	10.50	ectoderm	epidermis
+75%-epiboly	ZFA:0000088	9.45603194432745e-08	0.000102125144998736	"YSL"	581	55	29.06	yolk-derived	YSL
+Prim-5	ZFA:0000088	1.73206534879373e-20	1.85504198855809e-17	"YSL"	581	77	19.20	yolk-derived	YSL
+1-4-somites	ZFA:0000091	2.28918023556445e-07	0.000274472710244178	"axial chorda mesoderm"	111	13	6.10	mesoderm	notochord
+1-4-somites	ZFA:0000095	2.22980949164362e-07	0.00026735415804807	"pharyngeal arch 3-7 skeleton"	862	78	47.39	ectoderm	"neural crest"
+Long-pec	ZFA:0000101	9.46964406051425e-06	0.0105302441952919	"diencephalon"	1085	67	28.38	ectoderm	neural
+Prim-25	ZFA:0000101	2.49830252887237e-07	0.00028480648829145	"diencephalon"	1085	70	28.56	ectoderm	neural
+Protruding-mouth	ZFA:0000101	4.93961444154419e-18	6.25849149743649e-15	"diencephalon"	1085	127	75.83	ectoderm	neural
+Prim-5	ZFA:0000105	8.55662503686646e-08	9.16414541448398e-05	"epidermis"	464	39	15.34	ectoderm	epidermis
+14-19-somites	ZFA:0000106	3.06446190085686e-12	2.41786043977606e-09	"extension"	222	27	5.28	yolk-derived	"yolk ball/extension"
+Protruding-mouth	ZFA:0000107	9.15524205785243e-16	1.1599691687299e-12	"eye"	2479	175	173.25	ectoderm	neural
+1-4-somites	ZFA:0000108	6.72530414337713e-09	8.06363966790918e-06	"fin"	413	25	22.71	NULL	fin
+Long-pec	ZFA:0000109	4.37217039800033e-09	4.86185348257637e-06	"forebrain"	883	49	23.10	ectoderm	neural
+Prim-25	ZFA:0000109	9.22070390932717e-10	1.0511602456633e-06	"forebrain"	883	59	23.24	ectoderm	neural
+Protruding-mouth	ZFA:0000109	6.6712220889238e-19	8.45243838666645e-16	"forebrain"	883	66	61.71	ectoderm	neural
+14-19-somites	ZFA:0000110	1.24051259846901e-13	9.78764440192053e-11	"fourth ventricle"	167	26	3.97	ectoderm	neural
+Day-4	ZFA:0000112	2.07177489047486e-14	2.68087670827446e-11	"gut"	1099	121	119.99	endoderm	gut
+1-4-somites	ZFA:0000117	1.0404533078422e-10	1.2475035161028e-07	"hypoblast"	112	21	6.16	mesoderm	NULL
+50%-epiboly	ZFA:0000117	1.2793045097688e-06	0.00113474310016493	"hypoblast"	112	14	4.35	mesoderm	NULL
+Day-5	ZFA:0000119	4.31986610176996e-09	5.34799423399121e-06	"retinal inner nuclear layer"	414	92	60.01	ectoderm	neural
+Long-pec	ZFA:0000119	4.09317177512384e-06	0.0045516070139377	"retinal inner nuclear layer"	414	29	10.83	ectoderm	neural
+Protruding-mouth	ZFA:0000119	2.95200862348729e-08	3.74019492595839e-05	"retinal inner nuclear layer"	414	64	28.93	ectoderm	neural
+1-4-somites	ZFA:0000121	6.13702173914741e-12	7.35828906523774e-09	"lateral plate mesoderm"	162	23	8.91	mesoderm	"haematopoietic system"
+Day-4	ZFA:0000123	1.6197466603097e-13	2.09595217844075e-10	"liver"	1962	271	214.21	endoderm	liver
+1-4-somites	ZFA:0000128	2.0409225392738e-06	0.00244706612458928	"midbrain"	1312	120	72.13	ectoderm	neural
+Prim-25	ZFA:0000128	1.40706236867992e-10	1.60405110029511e-07	"midbrain"	1312	73	34.53	ectoderm	neural
+Prim-25	ZFA:0000131	2.3265864428798e-05	0.0265230854488297	"neural keel"	136	13	3.58	ectoderm	neural
+1-4-somites	ZFA:0000135	8.57147083382286e-07	0.00102771935297536	"notochord"	1083	96	59.54	mesoderm	notochord
+1-4-somites	ZFA:0000141	2.49437198577526e-14	2.99075201094454e-11	"pectoral fin bud"	303	41	16.66	NULL	fin
+Prim-25	ZFA:0000146	8.13185211580629e-06	0.00927031141201917	"presumptive brain"	28	1	0.74	ectoderm	neural
+Prim-25	ZFA:0000152	2.40478532794599e-07	0.000274145527385843	"retina"	1650	72	43.43	ectoderm	neural
+Protruding-mouth	ZFA:0000152	1.49559095857133e-21	1.89491374450988e-18	"retina"	1650	191	115.31	ectoderm	neural
+1-4-somites	ZFA:0000155	6.08443607453388e-15	7.29523885336612e-12	"somite"	1639	164	90.11	mesoderm	muscle
+Prim-5	ZFA:0000155	2.05000622013193e-05	0.0219555666176129	"somite"	1639	101	54.18	mesoderm	muscle
+Long-pec	ZFA:0000160	8.54958017567015e-06	0.00950713315534521	"tegmentum"	611	41	15.98	ectoderm	neural
+Prim-25	ZFA:0000160	4.20096835424903e-11	4.78910392384389e-08	"tegmentum"	611	47	16.08	ectoderm	neural
+Protruding-mouth	ZFA:0000160	1.45658351713779e-05	0.0184549131621357	"tegmentum"	611	69	42.70	ectoderm	neural
+Protruding-mouth	ZFA:0000162	1.22156862016947e-11	1.54772744175472e-08	"trigeminal placode"	213	47	14.89	ectoderm	neural
+Prim-25	ZFA:0000190	4.27590931496832e-08	4.87453661906388e-05	"ganglion"	5	1	0.13	ectoderm	"neural crest"
+Protruding-mouth	ZFA:0000190	8.04134190662746e-22	1.0188380195697e-18	"ganglion"	5	1	0.35	ectoderm	"neural crest"
+1-4-somites	ZFA:0000207	4.32950256217892e-06	0.00519107357205253	"fin musculature"	5	1	0.27	mesoderm	muscle
+Day-4	ZFA:0000242	3.37372369244069e-10	4.36559845801825e-07	"male organism"	96	22	10.48	mesoderm	"reproductive system"
+Day-5	ZFA:0000242	3.73178203434277e-05	0.0461994615851635	"male organism"	96	17	13.91	mesoderm	"reproductive system"
+1-4-somites	ZFA:0000255	8.81947895372445e-15	1.05745552655156e-11	"paraxial mesoderm"	191	40	10.50	mesoderm	muscle
+Prim-5	ZFA:0000255	9.93101919773951e-06	0.010636121560779	"paraxial mesoderm"	191	11	6.31	mesoderm	muscle
+Protruding-mouth	ZFA:0000257	1.94459476642333e-05	0.0246380156905836	"pectoral fin cartilage"	48	15	3.35	mesoderm	skeleton
+1-4-somites	ZFA:0000279	5.25767588983392e-16	6.30395339191088e-13	"segmental plate"	408	85	22.43	mesoderm	muscle
+Prim-5	ZFA:0000279	3.41066209468024e-05	0.0365281910340253	"segmental plate"	408	17	13.49	mesoderm	muscle
+Prim-5	ZFA:0000292	2.42474999869564e-07	0.000259690724860304	"surface structure"	124	5	4.10	NULL	NULL
+Protruding-mouth	ZFA:0000295	1.15837841845449e-07	0.000146766545618184	"trigeminal ganglion"	201	38	14.05	ectoderm	"neural crest"
+Prim-5	ZFA:0000339	1.13063241510313e-05	0.0121090731657545	"digestive system"	78	4	2.58	endoderm	gut
+Protruding-mouth	ZFA:0000351	4.18908313469543e-06	0.00530756833165911	"olfactory region"	4	2	0.28	ectoderm	neural
+Prim-5	ZFA:0000368	3.74327783750968e-05	0.0400905056397287	"integument"	594	28	19.63	ectoderm	epidermis
+1-4-somites	ZFA:0000393	4.30711705951884e-15	5.16423335436309e-12	"mesenchyme"	50	4	2.75	mesoderm	mesenchyme
+20-25-somites	ZFA:0000393	2.81941285389344e-05	0.0273483046827663	"mesenchyme"	50	5	1.42	mesoderm	mesenchyme
+Prim-25	ZFA:0000393	2.54545169160955e-05	0.0290181492843488	"mesenchyme"	50	2	1.32	mesoderm	mesenchyme
+Prim-25	ZFA:0000396	2.97687312552104e-08	3.39363536309399e-05	"nervous system"	430	12	11.32	ectoderm	neural
+Day-5	ZFA:0000402	8.92067320273318e-07	0.00110437934249837	"olfactory bulb"	183	47	26.53	ectoderm	neural
+Protruding-mouth	ZFA:0000402	9.33952036241842e-09	1.18331722991841e-05	"olfactory bulb"	183	38	12.79	ectoderm	neural
+Day-4	ZFA:0000413	2.9668136726267e-11	3.83905689237894e-08	"gonad"	61	9	6.66	mesoderm	"reproductive system"
+Day-5	ZFA:0000413	2.64011717989504e-07	0.000326846506871006	"gonad"	61	9	8.84	mesoderm	"reproductive system"
+Prim-25	ZFA:0000418	4.58057102382632e-06	0.005221850967162	"pretectum"	75	13	1.97	ectoderm	neural
+1-4-somites	ZFA:0000434	6.5442363563421e-11	7.84653939125418e-08	"skeletal system"	14	2	0.77	mesoderm	skeleton
+Day-5	ZFA:0000436	6.41060147009691e-08	7.93632461997997e-05	"spleen"	451	90	65.37	mesoderm	spleen
+1-4-somites	ZFA:0000445	4.79486833646765e-08	5.74904713542472e-05	"optic tectum"	1276	114	70.16	ectoderm	neural
+Prim-25	ZFA:0000445	8.21555238048483e-06	0.0093657297137527	"optic tectum"	1276	59	33.58	ectoderm	neural
+Prim-15	ZFA:0000473	1.06141357610408e-05	0.00798183009230266	"trunk musculature"	162	8	2.69	mesoderm	muscle
+Prim-5	ZFA:0000473	9.23422079047581e-08	9.88985046659959e-05	"trunk musculature"	162	8	5.35	mesoderm	muscle
+Prim-25	ZFA:0000505	4.59203743458217e-06	0.00523492267542367	"dorsal telencephalon"	125	17	3.29	ectoderm	neural
+Day-5	ZFA:0000509	1.77322094302089e-09	2.19524752745986e-06	"epithalamus"	33	5	4.78	ectoderm	neural
+Day-4	ZFA:0000529	9.07815665760085e-08	0.000117471347149355	"kidney"	767	114	83.74	mesoderm	kidney
+Day-5	ZFA:0000529	5.68177898402522e-07	0.000703404238222323	"kidney"	767	140	111.17	mesoderm	kidney
+75%-epiboly	ZFA:0000541	3.77071346463682e-05	0.0407237054180777	"marginal blastomere"	33	3	1.65	mesoderm	NULL
+Day-5	ZFA:0000545	1.33490091570684e-10	1.65260733364507e-07	"medulla oblongata"	123	37	17.83	ectoderm	neural
+Prim-5	ZFA:0000548	2.84087257486861e-11	3.04257452768428e-08	"musculature system"	273	19	9.02	mesoderm	muscle
+1-4-somites	ZFA:0000563	1.49784656096601e-05	0.0179591802659824	"pectoral fin musculature"	608	62	33.43	mesoderm	muscle
+Prim-25	ZFA:0000571	4.80842151305903e-07	0.000548160052488729	"presumptive telencephalon"	90	11	2.37	ectoderm	neural
+Long-pec	ZFA:0000588	2.11704178679844e-05	0.0235415046691987	"statoacoustic (VIII) ganglion"	60	11	1.57	ectoderm	"neural crest"
+1-4-somites	ZFA:0000591	5.98361099178341e-15	7.17434957914831e-12	"presumptive paraxial mesoderm"	28	8	1.54	mesoderm	muscle
+Day-4	ZFA:0000598	5.7689394223747e-08	7.46500761255286e-05	"testis"	731	111	79.81	mesoderm	"reproductive system"
+Day-5	ZFA:0000598	2.44645665170845e-05	0.0302871333481506	"testis"	731	119	105.96	mesoderm	"reproductive system"
+Day-5	ZFA:0000632	1.17171498451808e-06	0.00145058315083338	"reproductive system"	6	1	0.87	mesoderm	"reproductive system"
+Prim-25	ZFA:0000761	1.42191426144893e-09	1.62098225805178e-06	"basal plate midbrain region"	292	26	7.69	ectoderm	neural
+Prim-25	ZFA:0000778	8.28380015849379e-07	0.000944353218068292	"spinal cord interneuron"	64	12	1.68	ectoderm	neural
+1-4-somites	ZFA:0000789	4.85096288280202e-07	0.000581630449647963	"mesoderm pectoral fin bud"	12	2	0.66	mesoderm	NULL
+Prim-25	ZFA:0000821	1.27899445105445e-07	0.000145805367420207	"primary neuron hindbrain"	16	8	0.42	ectoderm	neural
+Prim-25	ZFA:0000822	2.48366630407983e-06	0.00283137958665101	"rhombomere 2"	88	14	2.32	ectoderm	neural
+1-4-somites	ZFA:0000823	2.56228708673631e-06	0.00307218221699684	"rhombomere 5"	134	24	7.37	ectoderm	neural
+1-4-somites	ZFA:0001000	3.77279779591908e-06	0.00452358455730697	"mesenchyme pectoral fin"	57	6	3.13	mesoderm	mesenchyme
+Prim-5	ZFA:0001056	9.40041267614412e-07	0.00100678419761503	"myotome"	825	50	27.27	mesoderm	muscle
+Prim-25	ZFA:0001064	8.52357573969506e-11	9.71687634325237e-08	"rhombomere"	265	32	6.97	ectoderm	neural
+Prim-5	ZFA:0001073	2.35469284259395e-05	0.0252187603441812	"axial vasculature"	136	20	4.50	mesoderm	"haematopoietic system"
+Day-4	ZFA:0001076	3.68189344901442e-18	4.76437012302466e-15	"intestinal bulb"	276	78	30.13	endoderm	gut
+Prim-25	ZFA:0001083	1.19098414153794e-06	0.00135772192135325	"ventricular zone"	386	30	10.16	ectoderm	neural
+128-cell	ZFA:0001093	1	1	"unspecified"	0	0	0	NULL	NULL
+1-4-somites	ZFA:0001093	9.13767824754011e-06	0.0109560762188006	"unspecified"	4313	279	237.13	NULL	NULL
+1-cell	ZFA:0001093	4.61281814532589e-09	3.91628260538168e-06	"unspecified"	4313	284	182.94	NULL	NULL
+1k-cell	ZFA:0001093	1	1	"unspecified"	0	0	0	NULL	NULL
+2-cell	ZFA:0001093	1	1	"unspecified"	0	0	0	NULL	NULL
+Dome	ZFA:0001093	1	1	"unspecified"	0	0	0	NULL	NULL
+Shield	ZFA:0001093	3.10483556539647e-12	2.89370674694951e-09	"unspecified"	4313	216	173.73	NULL	NULL
+Long-pec	ZFA:0001094	1.62036166468814e-09	1.80184217113322e-06	"whole organism"	6938	187	181.47	NULL	NULL
+Shield	ZFA:0001104	2.51616395438495e-06	0.00234506480548677	"pharyngeal endoderm"	46	3	1.85	endoderm	"endoderm cell"
+Prim-15	ZFA:0001105	4.01391617101054e-05	0.0301846496059993	"embryonic structure"	15	1	0.25	NULL	NULL
+Prim-5	ZFA:0001105	2.87554902446915e-06	0.00307971300520646	"embryonic structure"	15	1	0.50	NULL	NULL
+Prim-5	ZFA:0001115	4.2160333736736e-08	4.51537174320443e-05	"trunk"	721	34	23.83	NULL	NULL
+Prim-25	ZFA:0001120	1.1498707739946e-09	1.31085268235384e-06	"neuroectoderm"	96	11	2.53	ectoderm	neural
+Protruding-mouth	ZFA:0001123	5.79051366398877e-06	0.00733658081227378	"axial fin skeleton"	4	2	0.28	mesoderm	skeleton
+Day-5	ZFA:0001127	2.21989981025299e-07	0.00027482359650932	"visual system"	4	1	0.58	ectoderm	neural
+Protruding-mouth	ZFA:0001127	2.68429347674571e-16	3.40099983503681e-13	"visual system"	4	2	0.28	ectoderm	neural
+Protruding-mouth	ZFA:0001149	3.2083659177498e-06	0.004064999617789	"olfactory system"	24	5	1.68	ectoderm	neural
+Day-5	ZFA:0001158	1.30215410215128e-11	1.61206677846328e-08	"endocrine system"	21	4	3.04	NULL	"endocrine system"
+1-4-somites	ZFA:0001161	9.21999445403326e-12	1.10547733503859e-08	"pectoral fin"	921	92	50.64	NULL	fin
+Prim-5	ZFA:0001161	1.34519157920476e-05	0.014407001813283	"pectoral fin"	921	50	30.44	NULL	fin
+75%-epiboly	ZFA:0001185	1.82986923713713e-11	1.9762587761081e-08	"periderm"	394	50	19.70	ectoderm	epidermis
+1-4-somites	ZFA:0001187	3.9246486247583e-05	0.0470565370108521	"presumptive midbrain hindbrain boundary"	7	3	0.38	ectoderm	neural
+1-4-somites	ZFA:0001194	5.9666487593347e-07	0.000715401186244231	"cranial neural crest"	44	8	2.42	ectoderm	"neural crest"
+Protruding-mouth	ZFA:0001202	9.30190479389289e-13	1.17855133738623e-09	"optic cup"	181	14	12.65	ectoderm	neural
+1-4-somites	ZFA:0001204	5.90650861021293e-09	7.0819038236453e-06	"axial mesoderm"	89	17	4.89	mesoderm	notochord
+50%-epiboly	ZFA:0001204	3.72912073169307e-05	0.0330773008901176	"axial mesoderm"	89	7	3.46	mesoderm	notochord
+Prim-25	ZFA:0001208	8.45654391352349e-07	0.000964046006141677	"presumptive rhombomere 2"	24	3	0.63	ectoderm	neural
+1-4-somites	ZFA:0001210	7.45039918263968e-06	0.00893302861998498	"presumptive rhombomere 6"	21	9	1.15	ectoderm	neural
+1-4-somites	ZFA:0001211	1.43483606146888e-08	1.72036843770118e-05	"presumptive rhombomere 5"	32	11	1.76	ectoderm	neural
+1-4-somites	ZFA:0001212	1.27275246513672e-07	0.000152603020569892	"presumptive rhombomere 4"	37	14	2.03	ectoderm	neural
+Prim-25	ZFA:0001212	2.82465204269518e-05	0.032201033286725	"presumptive rhombomere 4"	37	4	0.97	ectoderm	neural
+Prim-25	ZFA:0001215	7.7719296948793e-07	0.00088599998521624	"thalamus"	102	11	2.68	ectoderm	neural
+1-4-somites	ZFA:0001216	9.08121614331765e-07	0.00108883781558379	"splanchnocranium"	90	7	4.95	ectoderm	"neural crest"
+20-25-somites	ZFA:0001218	1.29360335913092e-09	1.25479525835699e-06	"presumptive floor plate"	15	3	0.43	ectoderm	neural
+14-19-somites	ZFA:0001261	1.31302045354303e-09	1.03597313784545e-06	"ventricular system"	166	4	3.95	ectoderm	neural
+Prim-25	ZFA:0001289	4.17913167073495e-06	0.00476421010463785	"ciliary marginal zone"	127	16	3.34	ectoderm	neural
+Protruding-mouth	ZFA:0001310	6.21175658937515e-06	0.00787029559873832	"dorsolateral placode"	9	2	0.63	ectoderm	neural
+Protruding-mouth	ZFA:0001321	3.51096064038256e-07	0.00044483871313647	"neurocranial trabecula"	50	14	3.49	ectoderm	"neural crest"
+Day-4	ZFA:0001338	4.46945178575617e-26	5.78347061076849e-23	"intestine"	863	147	94.22	endoderm	gut
+Day-5	ZFA:0001338	1.16526115048773e-06	0.00144259330430381	"intestine"	863	134	125.09	endoderm	gut
+1-4-somites	ZFA:0001357	7.833294749996e-09	9.39212040524521e-06	"alar plate midbrain region"	404	60	22.21	ectoderm	neural
+Protruding-mouth	ZFA:0001359	4.17650394402936e-13	5.2916304970852e-10	"pineal complex"	32	4	2.24	ectoderm	neural
+75%-epiboly	ZFA:0001376	3.37963216422414e-07	0.000365000273736207	"presumptive ectoderm"	42	13	2.10	ectoderm	epidermis
+1-4-somites	ZFA:0001377	1.57488506390885e-09	1.88828719162671e-06	"presumptive mesoderm"	31	5	1.70	mesoderm	NULL
+1-4-somites	ZFA:0001378	6.15494554465584e-09	7.37977970804235e-06	"axial hypoblast"	22	2	1.21	mesoderm	hypoblast
+50%-epiboly	ZFA:0001378	1.85238697687206e-06	0.00164306724848552	"axial hypoblast"	22	7	0.85	mesoderm	hypoblast
+1-4-somites	ZFA:0001383	5.51784170612563e-12	6.61589220564463e-09	"fin bud"	78	6	4.29	NULL	fin
+Prim-5	ZFA:0001383	3.34481943347919e-06	0.00358230161325622	"fin bud"	78	3	2.58	NULL	fin
+Protruding-mouth	ZFA:0001424	4.88644997757716e-10	6.19113212159026e-07	"chondrocranium"	39	6	2.73	ectoderm	"neural crest"
+1-4-somites	ZFA:0001453	3.24487711288163e-14	3.89060765834507e-11	"pectoral fin field"	34	7	1.87	NULL	fin
+Protruding-mouth	ZFA:0001461	1.94873578238799e-09	2.46904823628558e-06	"chondrocranium cartilage"	17	5	1.19	ectoderm	"neural crest"
+50%-epiboly	ZFA:0001484	6.92099934925806e-06	0.0061389264227919	"superficial blastomere"	12	2	0.47	NULL	NULL
+75%-epiboly	ZFA:0001484	1.80264605583525e-09	1.94685774030207e-06	"superficial blastomere"	12	3	0.60	NULL	NULL
+Prim-5	ZFA:0001486	1.45246102904178e-06	0.00155558576210375	"epithelium"	14	1	0.46	NULL	NULL
+Protruding-mouth	ZFA:0001501	1.09486523774177e-05	0.0138719425621882	"cartilage element"	21	3	1.47	mesoderm	cartilage
+Protruding-mouth	ZFA:0001580	5.30136088196073e-07	0.000671682423744425	"neurocranium"	44	4	3.07	ectoderm	"neural crest"
+1-4-somites	ZFA:0001613	2.56142488957851e-06	0.00307114844260464	"pharyngeal arch 3-7"	241	19	13.25	ectoderm	"neural crest"
+Shield	ZFA:0001613	1.70080576709012e-05	0.01585150974928	"pharyngeal arch 3-7"	241	17	9.71	ectoderm	"neural crest"
+Day-5	ZFA:0001658	2.47537330532121e-05	0.0306451215198766	"hindbrain nucleus"	12	3	1.74	ectoderm	neural
+Day-5	ZFA:0001707	5.21766898709847e-07	0.00064594742060279	"brainstem"	9	3	1.30	ectoderm	neural
+Long-pec	ZFA:0001707	1.27023663741711e-05	0.0141250314080783	"brainstem"	9	1	0.24	ectoderm	neural
+Prim-25	ZFA:0001707	7.89367601320953e-11	8.99879065505887e-08	"brainstem"	9	1	0.24	ectoderm	neural
+1-4-somites	ZFA:0005042	1.11309132449169e-12	1.33459649806553e-09	"posterior lateral plate mesoderm"	53	6	2.91	mesoderm	NULL
+Prim-5	ZFA:0005042	1.9336775685343e-07	0.000207096867590024	"posterior lateral plate mesoderm"	53	4	1.75	mesoderm	NULL
+Prim-15	ZFA:0005145	4.90266506632869e-05	0.0368680412987918	"muscle"	693	12	11.52	mesoderm	muscle
+Prim-5	ZFA:0005145	6.80109198217406e-10	7.28396951290842e-07	"muscle"	693	35	22.91	mesoderm	muscle
+Protruding-mouth	ZFA:0005145	1.73894770461786e-06	0.00220324674175083	"muscle"	693	56	48.43	mesoderm	muscle
+Prim-15	ZFA:0005277	1.62700182536696e-05	0.0122350537267596	"skeletal muscle"	170	13	2.83	mesoderm	muscle
+Day-4	ZFA:0005738	5.56910182820524e-09	7.20641776569758e-06	"intestinal bulb primordium"	42	6	4.59	endoderm	gut
+1-4-somites	ZFA:0005771	9.08121614331765e-07	0.00108883781558379	"ectomesenchyme"	6	1	0.33	ectoderm	"neural crest"
+Protruding-mouth	ZFA:0007014	2.25770967664916e-09	2.86051816031448e-06	"anterior presumptive neural plate"	12	1	0.84	ectoderm	neural
+Prim-25	ZFA:0007016	7.48760399866097e-07	0.00085358685584735	"anterior neural plate"	31	4	0.82	ectoderm	neural
+Prim-25	ZFA:0007017	1.83831268992057e-11	2.09567646650945e-08	"posterior neural plate"	8	2	0.21	ectoderm	neural
+Prim-25	ZFA:0007018	7.38358097960478e-06	0.00841728231674945	"forebrain neural plate"	24	5	0.63	ectoderm	neural
+Protruding-mouth	ZFA:0007018	1.01935172801572e-09	1.29151863939591e-06	"forebrain neural plate"	24	2	1.68	ectoderm	neural
+1-4-somites	ZFA:0007019	5.40455876136207e-08	6.48006595487312e-05	"midbrain neural plate"	10	1	0.55	ectoderm	neural
+Prim-25	ZFA:0007019	3.36927154543904e-07	0.000384096956180051	"midbrain neural plate"	10	2	0.26	ectoderm	neural
+Prim-25	ZFA:0007022	1.05177127447174e-09	1.19901925289778e-06	"hindbrain neural plate"	180	13	4.74	ectoderm	neural
+20-25-somites	ZFA:0007023	3.74928953041937e-06	0.00363681084450679	"posterior neural keel"	10	3	0.28	ectoderm	neural
+Prim-25	ZFA:0007023	1.61190388455368e-11	1.8375704283912e-08	"posterior neural keel"	10	1	0.26	ectoderm	neural
+Prim-25	ZFA:0007024	7.26232751205384e-07	0.000827905336374138	"anterior neural keel"	28	5	0.74	ectoderm	neural
+1-4-somites	ZFA:0007025	4.66865786060456e-08	5.59772077486487e-05	"midbrain neural keel"	149	20	8.19	ectoderm	neural
+Prim-25	ZFA:0007025	3.37670782261585e-07	0.000384944691778206	"midbrain neural keel"	149	14	3.92	ectoderm	neural
+Prim-25	ZFA:0007026	7.59542551915208e-06	0.00865878509183337	"forebrain neural keel"	110	8	2.90	ectoderm	neural
+Prim-25	ZFA:0007029	7.69824091163309e-10	8.77599463926172e-07	"hindbrain neural keel"	90	12	2.37	ectoderm	neural
+20-25-somites	ZFA:0007030	4.96589585228976e-06	0.00481691897672107	"posterior neural rod"	4	2	0.11	ectoderm	neural
+1-4-somites	ZFA:0007032	3.35697559710929e-08	4.02501374093404e-05	"midbrain neural rod"	76	18	4.18	ectoderm	neural
+Prim-25	ZFA:0007032	4.35616446462301e-07	0.000496602748967024	"midbrain neural rod"	76	9	2.00	ectoderm	neural
+Prim-25	ZFA:0007034	5.54301182404311e-06	0.00631903347940914	"forebrain neural rod"	54	5	1.42	ectoderm	neural
+Prim-25	ZFA:0007036	3.86387261291082e-10	4.40481477871834e-07	"hindbrain neural rod"	41	6	1.08	ectoderm	neural
+20-25-somites	ZFA:0007037	7.44741553448048e-06	0.00722399306844606	"posterior neural tube"	21	2	0.60	ectoderm	neural
+Prim-25	ZFA:0007037	5.22867305246925e-12	5.96068727981494e-09	"posterior neural tube"	21	3	0.55	ectoderm	neural
+Protruding-mouth	ZFA:0007038	1.19943948259454e-06	0.00151968982444728	"anterior neural tube"	28	2	1.96	ectoderm	neural
+Prim-25	ZFA:0007039	5.07507493374501e-07	0.000578558542446931	"midbrain neural tube"	7	2	0.18	ectoderm	neural
+Prim-25	ZFA:0007041	7.17606059382885e-06	0.00818070907696489	"forebrain neural tube"	4	1	0.11	ectoderm	neural
+20-25-somites	ZFA:0007042	9.883357386364e-08	9.58685666477309e-05	"spinal cord neural tube"	91	12	2.58	ectoderm	neural
+Prim-25	ZFA:0007042	1.2629499638757e-13	1.4397629588183e-10	"spinal cord neural tube"	91	17	2.40	ectoderm	neural
+Prim-25	ZFA:0007043	2.78363363863687e-10	3.17334234804603e-07	"hindbrain neural tube"	16	3	0.42	ectoderm	neural
+14-19-somites	ZFA:0007044	3.01406709706861e-05	0.0237809893958714	"midbrain hindbrain boundary neural plate"	26	2	0.62	ectoderm	neural
+14-19-somites	ZFA:0007045	2.28880386179557e-05	0.018058662469567	"midbrain hindbrain boundary neural keel"	49	3	1.16	ectoderm	neural
+14-19-somites	ZFA:0007046	6.01567515910796e-05	0.0474636770053618	"midbrain hindbrain boundary neural rod"	45	2	1.07	ectoderm	neural
+14-19-somites	ZFA:0007047	3.32688190135021e-05	0.0262490982016532	"midbrain hindbrain boundary neural tube"	7	1	0.17	ectoderm	neural
+Prim-25	ZFA:0009011	1.34327105637889e-10	1.53132900427193e-07	"neuroblast"	17	7	0.45	ectoderm	neural
+Long-pec	ZFA:0009019	4.60277135679666e-07	0.000511828174875789	"neuronal stem cell"	13	1	0.34	ectoderm	neural
+Prim-25	ZFA:0009019	1.46325086337404e-10	1.66810598424641e-07	"neuronal stem cell"	13	3	0.34	ectoderm	neural
+Long-pec	ZFA:0009051	4.98088168713453e-06	0.0055387404360936	"interneuron"	16	3	0.42	ectoderm	neural
+Prim-25	ZFA:0009051	7.12888816341445e-10	8.12693250629248e-07	"interneuron"	16	4	0.42	ectoderm	neural
+Prim-25	ZFA:0009080	8.61212940940655e-13	9.81782752672346e-10	"neurectodermal cell"	4	1	0.11	ectoderm	neural
+Prim-25	ZFA:0009137	1.03452671303578e-12	1.17936045286079e-09	"ectodermal cell"	6	1	0.16	ectoderm	"ectoderm cell"
+14-19-somites	ZFA:0009139	1.07845373613966e-08	8.50899997814189e-06	"endodermal cell"	51	12	1.21	endoderm	"endoderm cell"
+Prim-25	ZFA:0009168	5.4602018812258e-08	6.22463014459742e-05	"neuroblast (sensu Vertebrata)"	2	1	0.05	ectoderm	neural
+Prim-25	ZFA:0009191	5.4011839318639e-07	0.000615734968232484	"CNS interneuron"	4	2	0.11	ectoderm	neural
+Prim-25	ZFA:0009242	4.11173837247481e-06	0.00468738174462129	"primary neuron"	88	14	2.32	ectoderm	neural
+Long-pec	ZFA:0009248	2.7539836776288e-07	0.000306242984952322	"neuron"	504	33	13.18	ectoderm	neural
+Prim-25	ZFA:0009248	6.29594726442813e-10	7.17737988144807e-07	"neuron"	504	31	13.27	ectoderm	neural
+Protruding-mouth	ZFA:0009248	9.76490600276663e-15	1.23721359055053e-11	"neuron"	504	90	35.22	ectoderm	neural
+Long-pec	ZFA:0009255	1.50764191286752e-05	0.0167649780710869	"amacrine cell"	78	13	2.04	ectoderm	neural
