@@ -811,6 +811,12 @@ pca <- pcaObj$pca
 PCDataList <- pcaObj$PCData
 matrixPlotList <- PCA_matrixPlot( PCDataList, pca, ddsRlog, numGenes = 100 )
 
+# save as both pdf and eps
+matrixFile <- file.path(rootPath, 'plots', 'Figure1-2.pdf' )
+ggsave(matrixFile, width = 20, height = 20, marrangeGrob(matrixPlotList, nrow = 6, ncol = 6) )
+```
+
+```{r printPCAMatrixPlot, include=TRUE}
 grid.newpage()
 grid.draw( 
   arrangeGrob( grobs = matrixPlotList,
@@ -818,10 +824,6 @@ grid.draw(
               )
 )
 dev.off()
-
-# save as both pdf and eps
-matrixFile <- file.path(rootPath, 'plots', 'Figure1-2.pdf' )
-ggsave(matrixFile, width = 20, height = 20, marrangeGrob(matrixPlotList, nrow = 6, ncol = 6) )
 ```
 
 ### Figure 1-3
@@ -867,6 +869,12 @@ detctPCDataList <- detctpcaObj$PCData
 detctMatrixPlotList <- PCA_matrixPlot( PCDataList, detctpcaObj$pca, 
                                        detctDESeqDataSetVst, numGenes = 100 )
 
+ggsave(file.path(rootPath, 'plots', 'Figure1-4.pdf'), 
+       width = 20, height = 20, 
+       marrangeGrob(detctMatrixPlotList, nrow = 6, ncol = 6) )
+```
+
+```{r print_detct_pca, include=TRUE}
 grid.newpage()
 grid.draw( 
   arrangeGrob( grobs = detctMatrixPlotList,
@@ -874,10 +882,6 @@ grid.draw(
               )
 )
 dev.off()
-
-ggsave(file.path(rootPath, 'plots', 'Figure1-4.pdf'), 
-       width = 20, height = 20, 
-       marrangeGrob(detctMatrixPlotList, nrow = 6, ncol = 6) )
 ```
 
 ## Figure 3
@@ -2069,6 +2073,8 @@ for( i in seq_len(length(chrSpecificGeneExprPlotNoLegendList)) ){
       width=1.5,height=24*plotHeights[i], paper = "special")
   print(chrSpecificGeneExprPlotNoLegendList[[i]])
   dev.off()
+  
+  print(chrSpecificGeneExprPlotNoLegendList[[i]])
 }
 
 # print one with a legend to get the legend
@@ -2434,6 +2440,6 @@ for( plotInfo in plotList ){
 
 ## Session Info
 
-```{r sessionInfo, echo=FALSE, results='markup'}
+```{r sessionInfo, echo=FALSE, results='markup', include=TRUE}
 sessionInfo()
 ```
