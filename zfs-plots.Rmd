@@ -10,7 +10,7 @@ output: html_document
 packages <-  c("knitr", "rprojroot", "ggplot2", "reshape2", 
                "scales", "GenomicFeatures", "plyr", "RColorBrewer",
                "cba", "topGO", "grid", "gridExtra", "Rgraphviz", "biomaRt", "htmlTable",
-               "DESeq2", "genefilter", "qvalue" )
+               "DESeq2", "genefilter", "qvalue", "rgl" )
 for( package in packages ){
   if(!require( package, character.only = TRUE )){
     install.packages( package )
@@ -359,7 +359,7 @@ sampleCorHeatmap <- ggplot(data = sampleCor.m) +
 
 
 plotList <- add_to_plot_list( plotList, 
-                              sampleCorHeatmap, file.path(rootPath, 'plots', 'fig.1d.pdf') )
+                              sampleCorHeatmap, file.path(rootPath, 'plots', 'Figure.1d.pdf') )
 
 print(sampleCorHeatmap)
 ```
@@ -503,6 +503,38 @@ plotList <- add_to_plot_list( plotList,
                               pc1_pc3Plot, 
                               file.path(rootPath, 'plots', 'Figure.1f.pdf') )
 print( pc1_pc3Plot )
+```
+
+#### 3d plot
+
+```{r pcaPlot3D, include=TRUE}
+# PCA
+# regionCount <- nrow(assay(ddsRlog))
+# rv <- rowVars(assay(ddsRlog))
+# select <- order(rv, decreasing=TRUE)[seq_len(min(regionCount, length(rv)))]
+pca <- pcaObj$pca
+# propVarPC <- pca$sdev^2 / sum( pca$sdev^2 )
+# aload <- abs(pca$rotation)
+# propVarRegion <- sweep(aload, 2, colSums(aload), "/")
+
+# plot first 3 components
+# choose plot colours
+numLevels <- nlevels(colData(ddsRlog)$stageName)
+ord1 <- seq(1,numLevels,2)
+ord2 <- seq(2,numLevels,2)
+colourPalette <- hue_pal()(numLevels)[ order(c(ord1,ord2)) ]
+plotColours <- rep( colourPalette, each = 5 )
+
+op <- par3d()
+par3d( cex = 0.5 )
+plot3d(pca$x[,"PC1"], pca$x[,"PC2"], pca$x[,"PC3"],  col=plotColours,
+       type="s", size = 1, 
+       xlab="PC1", ylab="PC2", zlab="PC3" )
+rgl.viewpoint( theta = 30, phi = 5 )
+
+rgl.postscript( filename =file.path(rootPath, 'plots', 'Figure.1g.pdf'), 
+                fmt = 'pdf', drawText = TRUE 
+)
 ```
 
 ### PC Median Heatmaps
@@ -699,7 +731,7 @@ genesDistPlot <- ggplot(data=meanTpmFilt, aes(meanExpr) ) +
          strip.background = element_rect(fill="grey90", colour = "white")
          )
 
-pdf( file.path(rootPath, 'plots', 'Figure1-1.pdf'), width = 9, height = 6 )
+pdf( file.path(rootPath, 'plots', 'Figure.1-1.pdf'), width = 9, height = 6 )
 print(genesDistPlot)
 dev.off()
 
@@ -812,7 +844,7 @@ PCDataList <- pcaObj$PCData
 matrixPlotList <- PCA_matrixPlot( PCDataList, pca, ddsRlog, numGenes = 100 )
 
 # save as both pdf and eps
-matrixFile <- file.path(rootPath, 'plots', 'Figure1-2.pdf' )
+matrixFile <- file.path(rootPath, 'plots', 'Figure.1-2.pdf' )
 ggsave(matrixFile, width = 20, height = 20, marrangeGrob(matrixPlotList, nrow = 6, ncol = 6) )
 ```
 
@@ -853,7 +885,7 @@ detctSampleCorHeatmap <- ggplot(data = detctSampleCor.m) +
 
 
 plotList <- add_to_plot_list( plotList, 
-                              detctSampleCorHeatmap, file.path(rootPath, 'plots', 'Figure1-3.pdf') )
+                              detctSampleCorHeatmap, file.path(rootPath, 'plots', 'Figure.1-3.pdf') )
 
 print(detctSampleCorHeatmap)
 ```
@@ -869,7 +901,7 @@ detctPCDataList <- detctpcaObj$PCData
 detctMatrixPlotList <- PCA_matrixPlot( PCDataList, detctpcaObj$pca, 
                                        detctDESeqDataSetVst, numGenes = 100 )
 
-ggsave(file.path(rootPath, 'plots', 'Figure1-4.pdf'), 
+ggsave(file.path(rootPath, 'plots', 'Figure.1-4.pdf'), 
        width = 20, height = 20, 
        marrangeGrob(detctMatrixPlotList, nrow = 6, ncol = 6) )
 ```
@@ -1012,7 +1044,7 @@ tpmMSHeatmap <- tpmMSHeatmap + guides( fill = guide_colorbar(title = "tpm\n(max 
 # add to plot list
 plotList <- add_to_plot_list( plotList, 
                               tpmMSHeatmap, 
-                              file.path(rootPath, 'plots', 'Figure3a-tpm-heatmap.pdf') )
+                              file.path(rootPath, 'plots', 'Figure.3a-tpm-heatmap.pdf') )
 
 print( tpmMSHeatmap )
 ```
@@ -1044,6 +1076,10 @@ if( file.exists(AllGenesInfoFile) ){
   
   write.table(AllGenesInfo, file = AllGenesInfoFile, sep="\t", quote = FALSE, col.names = TRUE, row.names = FALSE)
 }
+
+# make named vactor of gene names for later
+geneNames <- as.character( AllGenesInfo$external_gene_name )
+names(geneNames) <- as.character( AllGenesInfo$ensembl_gene_id )
 
 # a set of patterns to check for
 patterns <- c(
@@ -1220,7 +1256,7 @@ pvalueCombinedHeatmap <- ggplot( data = tilePlotData ) +
 # add to plot list
 plotList <- add_to_plot_list( plotList, 
                               pvalueCombinedHeatmap, 
-                              file.path(rootPath, 'plots', 'Figure3a-zfa-heatmap.pdf') )
+                              file.path(rootPath, 'plots', 'Figure.3a-zfa-heatmap.pdf') )
 
 print(pvalueCombinedHeatmap)
 ```
@@ -2045,8 +2081,10 @@ print(cl4_22_37_84_hist)
 
 Histogram showing the distribution of genes in clusters 4, 22, 37 and 84, split by cluster.
 
-### Figure 4-3
 #### Regional expression
+
+### Figure 4-3A
+
 ```{r regional_expr_plot, include=TRUE}
 # make a chromosomal order plot for every chromosome
 chrSpecificGeneExprList <- lapply( seq_len(25),
@@ -2083,6 +2121,48 @@ chrSpecificGeneExprPlotList[[1]] +
   scale_fill_gradientn( limits = c(0,maxtpm),
   colours = c("blue", "yellow", "red") )
 dev.off()
+```
+
+### Figure 4-3 B-G
+```{r fig.4.3b-g, include=TRUE}
+regions <- list(
+  crystallins = list( chr = "9", start = 22082881, end = 22866634 ),
+  cathepsins = list( chr = "12", start = 16470000, end = 16800000 ),
+  her = list( chr = "11", start = 41354000, end = 41449985 ),
+  hist1 = list( chr = "7", start = 5408320, end = 6331233 ),
+  hist2.1 = list( chr = "25", start = 34600000, end = 34650000 ),
+  hist2.2 = list( chr = "25", start = 35760000, end = 35850000 )
+)
+
+for( i in seq_len(length(geneNames)) ){
+  if( geneNames[i] == "" ){
+    geneNames[i] <- names(geneNames)[i]
+  }
+}
+
+closeUpPlotList <- lapply( regions,
+                           function( x ){ return( plotExprByChr( x$chr, x$start, x$end, position = FALSE) ) }
+                           )
+# get max value
+maxValue <- log10( max( sapply( closeUpPlotList, function(x){ return( max(x$tpms) ) } ) ) )
+
+add_gene_names <- function( closeUpInfo ){
+  geneLabels <- geneNames[ rownames(closeUpInfo$tpms) ]
+  return( closeUpInfo$plot + scale_y_discrete(labels=geneLabels) +
+            scale_fill_gradientn( limits = c(0,maxValue),
+                                colours = c("blue", "yellow", "red"),
+                                guide = guide_colorbar(title = "log10 TPM") ) )
+}
+closeUpPlots <- lapply( closeUpPlotList, add_gene_names )
+
+print(closeUpPlots)
+
+figLetters <- letters[2:7]
+for( i in seq_len(length(closeUpPlots)) ){
+  pdf( file = file.path(rootPath, 'plots', paste0('Figure.4-3', figLetters[i], '.pdf') ) )
+  print(closeUpPlots[[i]])
+  dev.off
+}
 ```
 
 ## Figure 5
@@ -2157,9 +2237,6 @@ pairwiseCor <- pairwiseCor[!is.na(pairwiseCor$CorCoeff),]
 ```
 
 ```{r getGeneNames}
-geneNames <- as.character( AllGenesInfo$external_gene_name )
-names(geneNames) <- as.character( AllGenesInfo$ensembl_gene_id )
-
 # get gene names and add to pairwiseCor
 pairwiseCor$gene1Name <- geneNames[ as.character(pairwiseCor$gene1) ]
 pairwiseCor$gene2Name <- geneNames[ as.character(pairwiseCor$gene2) ]
@@ -2442,4 +2519,6 @@ for( plotInfo in plotList ){
 
 ```{r sessionInfo, echo=FALSE, results='markup', include=TRUE}
 sessionInfo()
+
+save.image(file=file.path(rootPath, 'workspace.RData'))
 ```
