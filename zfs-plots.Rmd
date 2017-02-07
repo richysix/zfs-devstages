@@ -34,7 +34,7 @@ figNum <- 1
 
 ```{r get_root}
 rootPath <- find_root(is_rstudio_project)
-for( dir in c('plots') ){
+for( dir in c('plots', 'topgo', file.path('topgo', 'maxByStage') ) ){
   dirPath <- file.path( rootPath, dir )
   if( !dir.exists(dirPath) ){
     dir.create( dirPath )
@@ -1049,7 +1049,7 @@ plotList <- add_to_plot_list( plotList,
 print( tpmMSHeatmap )
 ```
 
-```{r unchar_genes}
+```{r getGeneNames}
 #### Named vs Unnamed genes
 AllGenesInfoFile <- file.path(rootPath, 'dataFiles', 
                               paste0('Danio_rerio.e', ensVersion, '.geneInfo.tsv' ) )
@@ -1077,10 +1077,19 @@ if( file.exists(AllGenesInfoFile) ){
   write.table(AllGenesInfo, file = AllGenesInfoFile, sep="\t", quote = FALSE, col.names = TRUE, row.names = FALSE)
 }
 
-# make named vactor of gene names for later
+# make named vector of gene names for later
 geneNames <- as.character( AllGenesInfo$external_gene_name )
 names(geneNames) <- as.character( AllGenesInfo$ensembl_gene_id )
 
+# set any empty gene names to the corresponding gene id
+for( i in seq_len(length(geneNames)) ){
+  if( geneNames[i] == "" ){
+    geneNames[i] <- names(geneNames)[i]
+  }
+}
+```
+
+```{r unchar_genes}
 # a set of patterns to check for
 patterns <- c(
   '^[A-Z][A-Z][0-9]{6}\\.[0-9]+$',
@@ -1261,7 +1270,7 @@ plotList <- add_to_plot_list( plotList,
 print(pvalueCombinedHeatmap)
 ```
 
-```{r goEnrichment}
+```{r goEnrichment, eval=FALSE}
 # do Go enrichment on genes assigned to each stage by max mean expression
 
 # function to return sig genes by 'pvalue'
@@ -1276,14 +1285,14 @@ code2ontology <- list(
   "MF" = 'molecular_function'
 )
 # Read in GO annotation
+# see GO-biolayout.md for how these map files are produced
 id2GOList <- list()
 for( ontology in c('BP', 'CC', 'MF') ){
   mapFile <- file.path( 
     rootPath,
     'dataFiles',
-    'maxByStage',
     'topgo',
-    paste0(code2ontology[[ontology]], '.map' ) 
+    paste0(code2ontology[[ontology]], '.e', ensVersion, '.map' )
   )
   id2GOList[[ontology]] <- readMappings(file = mapFile)
 }
@@ -1315,6 +1324,7 @@ runTopGO <- function( stageIndex, countsList, ontologyClass, allGenes ){
   
   outputPrefix <- file.path( 
     'topgo',
+    'maxByStage',
     paste(stageName, ontologyClass, sep='.')
   )
   write.table( allRes, file=paste0(outputPrefix, ".topGO.tsv"), quote=FALSE,
@@ -1360,6 +1370,7 @@ outputStageGenes <- function( stageIndex, countsList, allGenes ){
   outputPrefix <- file.path(
     rootPath, 
     'topgo',
+    'maxByStage',
     stageName
   )
   write.table(geneInfo, file=paste0(outputPrefix, ".gene-list.tsv"),
@@ -1370,7 +1381,7 @@ outputStageGenes <- function( stageIndex, countsList, allGenes ){
 invisible( lapply(seq_len(length(tpmByStage)), outputStageGenes, tpmByStage, allGenes ) )
 ```
 
-```{bash parse_GO}
+```{bash parse_GO, eval=FALSE}
 # Run parse_GO script on max stage GO output
 # add local library paths
 eval $(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)
@@ -1380,13 +1391,13 @@ adjustedP=$(echo "0.05/18" | bc -l | sed -e 's|^|0|')
 
 for ontology in BP CC MF
 do
-for stage in $( find topgo | grep "$ontology.topGO.pdf" | sed -e "s|topgo/||; s|.$ontology.topGO.pdf||" )
+for stage in $( find topgo/maxByStage/ | grep "$ontology.topGO.pdf" | sed -e "s|topgo/maxByStage/||; s|.$ontology.topGO.pdf||" )
 do
 perl ./parse_GO_results.pl \
 --enriched --sig_level $adjustedP \
---output_file topgo/$stage.$ontology.topGO.sig.tsv \
-topgo/$stage.$ontology.topGO.tsv \
-topgo/$stage.gene-list.tsv > topgo/$stage.$ontology.enriched-GO.tsv
+--output_file topgo/maxByStage/$stage.$ontology.topGO.sig.tsv \
+topgo/maxByStage/$stage.$ontology.topGO.tsv \
+topgo/maxByStage/$stage.gene-list.tsv > topgo/maxByStage/$stage.$ontology.enriched-GO.tsv
 done
 done
 ```
@@ -1597,8 +1608,83 @@ kable( sigResults, row.names = FALSE, align = c('l', 'l', 'r', 'r', 'r', 'r', 'r
 Table showing clusters with significant chr enrichments (adjusted p-value < 0.05 and log2 fold change > 1).
 
 # Chr 4 Zinc Finger Genes 
+```{bash pfamInfo}
+###################################
+## GET PFAM INFO
+###################################
 
-```{bash chr4_ZnFs}
+# Check for existence of Pfma file
+# If not download it from EBI
+pfamMappingFile='pdb_pfam_mapping.txt'
+pfamFTPLink='ftp://ftp.ebi.ac.uk/pub/databases/Pfam/mappings/pdb_pfam_mapping.txt'
+
+# check for PFAM file
+if [[ ! -e $pfamMappingFile ]]
+then
+  # download from EBI
+  curl -O $pfamFTPLink
+fi
+```
+
+```{r getPFAMdomains}
+# get Pfam ID to Description
+pfamMappingFile <- file.path( rootPath, 'pdb_pfam_mapping.txt')
+pfamMapping <- read.table(file=pfamMappingFile, sep="\t", header=TRUE)
+# make named vector of IDs to Description
+pfamDesc <- data.frame(
+  pfam = gsub("\\.[0-9]+", "", pfamMapping$PFAM_ACC ),
+  pfamDescription = pfamMapping$PFAM_desc
+)
+```
+
+```{r get_chr4_genes}
+chr4Region = list( chr = "4", start = 24000000, end = NULL )
+
+  # connect to ensembl
+  # need the correct archive site 85 = jul2016.archive.ensembl.org
+  # to connect to the current database use
+  # ensBiomart <- useMart( "ensembl", dataset="drerio_gene_ensembl")
+  ensBiomart <- useMart(host='jul2016.archive.ensembl.org', biomart = "ENSEMBL_MART_ENSEMBL", dataset="drerio_gene_ensembl")
+
+getGenesForRegion <- function(chr, start = 1, end = NULL, AllGenesInfo){
+  if( is.null( end ) ){
+    end <- max( AllGenesInfo$end_position[ AllGenesInfo$chromosome_name == chr ] )
+  }
+  chr_specific_genes <- AllGenesInfo[ AllGenesInfo$chromosome_name == chr & 
+                                 AllGenesInfo$start_position >= start & 
+                                 AllGenesInfo$end_position <= end, ]
+  return( chr_specific_genes )
+}
+
+
+getGenesAndPfam <- function( biomartObj, chr, start = 1, end = NULL, pfamDesc ){
+  chr_specific_genes <- getGenesForRegion(chr, start = start, end = end, AllGenesInfo)
+  # get gene/Pfam info from Biomart
+  genes_Pfam_domains <- getBM( 
+    filters = "ensembl_gene_id",
+    attributes = c('ensembl_gene_id', 'external_gene_name', 'pfam'),
+    values = as.character( chr_specific_genes$ensembl_gene_id ),
+    mart = ensBiomart
+  )
+  # merge to Descriptions and get unqiue rows
+  Pfam_plusDesc <- merge(genes_Pfam_domains, pfamDesc)
+  Pfam_plusDesc <-  unique(Pfam_plusDesc[ , 1:4 ])
+  return(Pfam_plusDesc)
+}
+
+chr4_genes_Pfam <- getGenesAndPfam( ensBiomart, chr4Region$chr, 
+                                    chr4Region$start, chr4Region$end, 
+                                    pfamDesc )
+
+# get zinc finger genes
+chr4_ZnF_genes <- chr4_genes_Pfam[ grepl("[zZ]inc.finger", chr4_genes_Pfam$pfamDescription), ]
+# join to AllGenesInfo
+chr4_ZnF_geneInfo <- merge(AllGenesInfo, chr4_ZnF_genes)
+chr4_ZnF_geneInfo <- chr4_ZnF_geneInfo[ order(chr4_ZnF_geneInfo$start_position), ]
+chr4ZnFData <- unique(chr4_ZnF_geneInfo[ , 1:5 ])
+```
+
+```{bash chr4_ZnFs, eval=FALSE}
 # This takes the file of ZnF genes from chromsome 4 and which has multiple lines for each gene
 # and produces a list of unique gene ids sorted by chromsome and start position
 head -n1 dataFiles/rnaseq/chr4_ZnF.txt > dataFiles/rnaseq/chr4_ZnF.uniq.txt
@@ -1607,12 +1693,12 @@ dataFiles/rnaseq/chr4_ZnF.uniq.txt
 ```
 
 ```{r chr4_ZnF, include=TRUE}
-# read in ZnF/NLR data
-chr4ZnFFile <- file.path('dataFiles', 'rnaseq', 'chr4_ZnF.uniq.txt')
-chr4ZnFData <- read.table(chr4ZnFFile, sep="\t", header=TRUE)
+# # read in ZnF/NLR data
+# chr4ZnFFile <- file.path('dataFiles', 'rnaseq', 'chr4_ZnF.uniq.txt')
+# chr4ZnFData <- read.table(chr4ZnFFile, sep="\t", header=TRUE)
 
 # ZnF genes in clusters
-ZnFs <- clusterData[ as.character(chr4ZnFData$Ensembl.Gene.ID), ]
+ZnFs <- clusterData[ as.character(chr4ZnFData$ensembl_gene_id), ]
 ZnFs <- ZnFs[ !is.na(ZnFs$name), ]
 clusterCounts <- as.data.frame( table( ZnFs$cluster ) )
 colnames(clusterCounts)[1] <- "Cluster"
@@ -1828,12 +1914,7 @@ nlrlogtpmsInfo <- cluster_and_plot_tpms( nlrlogtpms, cluster = FALSE )
 ```{r }
 # function to plot the expression of genes from a section (or all) of chromosome
 plotExprByChr <- function( chr, start = 1, end = NULL, position = TRUE, tpm = tpmByStageClustered ){
-  if( is.null( end ) ){
-    end <- max( AllGenesInfo$end_position[ AllGenesInfo$chromosome_name == chr ] )
-  }
-  chr_specific_genes <- AllGenesInfo[ AllGenesInfo$chromosome_name == chr & 
-                                 AllGenesInfo$start_position >= start & 
-                                 AllGenesInfo$end_position <= end, ]
+  chr_specific_genes <- getGenesForRegion(chr, start = start, end = end, AllGenesInfo)
   # sort by position
   chr_specific_genes <- chr_specific_genes[ order(chr_specific_genes$start_position), ]
   
@@ -1878,10 +1959,24 @@ plotExprByChr <- function( chr, start = 1, end = NULL, position = TRUE, tpm = tp
 ```
 
 ```{r znfs_22, include=TRUE}
-regions <- list(
-  znfs_22 = list( chr = "22", start = 1900000, end = 2900000 )
-)
-znfs_22 <- plotExprByChr( regions$znfs_22$chr, regions$znfs_22$start, regions$znfs_22$end )
+znfs_22Region = list( chr = "22", start = 1900000, end = 2900000 )
+znfs_22 <- plotExprByChr( znfs_22Region$chr, znfs_22Region$start, znfs_22Region$end )
+
+# get gene info from biomart
+znfs_22Pfam <- getGenesAndPfam( ensBiomart, znfs_22Region$chr, 
+                                znfs_22Region$start, znfs_22Region$end, 
+                                pfamDesc )
+# join to AllGenesInfo
+znfs_22PfamInfo <- merge(AllGenesInfo, znfs_22Pfam, 
+                       by.x = c('ensembl_gene_id'), by.y = c('ensembl_gene_id') )
+
+znfs_22PfamInfo <- znfs_22PfamInfo[ order( znfs_22PfamInfo$start_position), 
+                                      c('ensembl_gene_id', 'external_gene_name.y', 
+                                        'chromosome_name',
+                                        'start_position', 'end_position',
+                                        'pfam', 'pfamDescription') ]
+names(znfs_22PfamInfo)[ grepl("external_gene_name.y", names(znfs_22PfamInfo)) ] <- 'external_gene_name'
+
 ```
 
 ```{r all_chr4_genes, include=TRUE}
@@ -2015,7 +2110,7 @@ dev.off()
 
 ### Fig4F-G - histograms of ZnF/NLR genes on chr 4
 ```{r hist, include=TRUE}
-plotData <- merge( chr4ZnFData, clusterData, by.x = "Ensembl.Gene.ID", by.y = "gene_id" )
+plotData <- merge( chr4ZnFData, clusterData, by.x = "ensembl_gene_id", by.y = "gene_id" )
 plotData$mid <- plotData$start + (plotData$end - plotData$start)/2
 
 histData <- rbind(
@@ -2068,7 +2163,7 @@ histxBreaks <- seq(0,80000000,20000000)
 histxLabels <- as.character( seq(0,80,20) )
 cl4_22_37_84_hist <- ggplot( data = histData ) +
   geom_histogram( aes( x = mid ), binwidth = 5000000, colour = "white" ) + 
-  scale_x_continuous( breaks = histxBreaks, labels = histxLabels ) +
+  scale_x_continuous( limits=c(0,80000000), breaks = histxBreaks, labels = histxLabels ) +
   labs(x = 'Position (Mb)', y = "Gene Count") +
   facet_wrap( ~ cluster ) +
   theme_minimal()
@@ -2125,7 +2220,7 @@ dev.off()
 
 ### Figure 4-3 B-G
 ```{r fig.4.3b-g, include=TRUE}
-regions <- list(
+selectedRegions <- list(
   crystallins = list( chr = "9", start = 22082881, end = 22866634 ),
   cathepsins = list( chr = "12", start = 16470000, end = 16800000 ),
   her = list( chr = "11", start = 41354000, end = 41449985 ),
@@ -2134,13 +2229,7 @@ regions <- list(
   hist2.2 = list( chr = "25", start = 35760000, end = 35850000 )
 )
 
-for( i in seq_len(length(geneNames)) ){
-  if( geneNames[i] == "" ){
-    geneNames[i] <- names(geneNames)[i]
-  }
-}
-
-closeUpPlotList <- lapply( regions,
+closeUpPlotList <- lapply( selectedRegions,
                            function( x ){ return( plotExprByChr( x$chr, x$start, x$end, position = FALSE) ) }
                            )
 # get max value
@@ -2151,7 +2240,8 @@ add_gene_names <- function( closeUpInfo ){
   return( closeUpInfo$plot + scale_y_discrete(labels=geneLabels) +
             scale_fill_gradientn( limits = c(0,maxValue),
                                 colours = c("blue", "yellow", "red"),
-                                guide = guide_colorbar(title = "log10 TPM") ) )
+                                guide = guide_colorbar(title = "log10 TPM") ) +
+            theme( plot.title = element_blank() ) )
 }
 closeUpPlots <- lapply( closeUpPlotList, add_gene_names )
 
@@ -2161,8 +2251,48 @@ figLetters <- letters[2:7]
 for( i in seq_len(length(closeUpPlots)) ){
   pdf( file = file.path(rootPath, 'plots', paste0('Figure.4-3', figLetters[i], '.pdf') ) )
   print(closeUpPlots[[i]])
-  dev.off
+  dev.off()
 }
+```
+
+```{r produceGeneLists}
+genesPfamList <- lapply( selectedRegions,
+                         function(x){
+                           return( getGenesAndPfam( ensBiomart, x$chr, 
+                                    x$start, x$end, 
+                                    pfamDesc ) )
+                         }
+  )
+
+# join to AllGenesInfo
+genesPfamInfo <- lapply( genesPfamList,
+                         function(x, AllGenesInfo){ 
+                           return( merge(AllGenesInfo, x, by.x = c('ensembl_gene_id'), by.y = c('ensembl_gene_id') ) )
+                         },
+                         AllGenesInfo
+  )
+
+genesPfamInfo <- lapply( genesPfamInfo,
+                         function(x){
+                           x <- x[ order( x$start_position), 
+                                      c('ensembl_gene_id', 'external_gene_name.y', 
+                                        'chromosome_name',
+                                        'start_position', 'end_position',
+                                        'pfam', 'pfamDescription') ]
+                           names(x)[ grepl("external_gene_name.y", names(x)) ] <- 'external_gene_name'
+                           return(x)
+                         }
+  )
+
+# join together chr4 znfs, 22 znfs and others and output as file
+pfamInfo <- rbind( chr4_ZnF_geneInfo,
+                   znfs_22PfamInfo,
+                   do.call('rbind', genesPfamInfo )
+)
+
+write.table(pfamInfo, file=file.path(rootPath, 'regionalExpression.PFAM.tsv'),
+            row.names = FALSE, quote = FALSE, sep=)
+
 ```
 
 ## Figure 5
@@ -2236,7 +2366,7 @@ pairwiseCor <- do.call( rbind, pairwiseCorList )
 pairwiseCor <- pairwiseCor[!is.na(pairwiseCor$CorCoeff),]
 ```
 
-```{r getGeneNames}
+```{r addGeneNames}
 # get gene names and add to pairwiseCor
 pairwiseCor$gene1Name <- geneNames[ as.character(pairwiseCor$gene1) ]
 pairwiseCor$gene2Name <- geneNames[ as.character(pairwiseCor$gene2) ]
