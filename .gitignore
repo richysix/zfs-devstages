@@ -13,3 +13,5 @@ dataFiles/detct/zfs-detct-grcz10.tsv
 dataFiles/rnaseq/zfs-rnaseq-grcz10.tsv
 *DS_Store*
 workspace.RData
+regionalExpression.PFAM.tsv
+pdb_pfam_mapping.txt
