@@ -14,3 +14,4 @@ dataFiles/rnaseq/zfs-rnaseq-grcz10.tsv
 workspace.RData
 regionalExpression.PFAM.tsv
 pdb_pfam_mapping.txt
+dataFiles/paralogues-Biomart.txt
