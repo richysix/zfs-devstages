@@ -6,7 +6,6 @@ topgo/*
 Danio_rerio.*
 ZF-Paralogues.pearson.tsv
 e85.maxStageClusters.gene_counts.tsv
-dataFiles/one-to-one-paralogues*
 dataFiles/AllGenes.85.biomart.tsv
 dataFiles/rnaseq/chr4_ZnF.uniq.txt
 dataFiles/detct/zfs-detct-grcz10.tsv
