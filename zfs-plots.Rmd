@@ -2298,28 +2298,11 @@ write.table(pfamInfo, file=file.path(rootPath, 'regionalExpression.PFAM.tsv'),
 ## Figure 5
 ### Fig5A
 #### Pearson histogram (Paralogues)
-```{bash paralogueData}
-# paralogues-Biomart.txt is a file downloaded from biomart
-# with ??? selected
-
-# grep teleost-specific pairs
-grep -E 'Clupeocephala|Danio rerio|Neopterygii|Otophysi' dataFiles/paralogues-Biomart.txt | \
-cut -f1 | sort | uniq -c | sort -k1,1nr | grep -E '^[[:space:]]+1[[:space:]]' | \
-awk '{print $2}' | sort > dataFiles/one-to-one-paralogues.tmp
-
-# grep out pairs
-# need to get rid of split genes
-sort -t$'\t' -k1,1 dataFiles/paralogues-Biomart.txt | \
-join -t$'\t' - dataFiles/one-to-one-paralogues.tmp | \
-grep -E 'Clupeocephala|Danio rerio|Neopterygii|Otophysi' | grep -v gene_split | \
-perl -F"\t" -lane 'BEGIN{%genes_seen;}
-if( !exists $genes_seen{$F[0]} ){ $genes_seen{$F[0]} = 1; $genes_seen{$F[3]} = 1; print $_ }' > dataFiles/one-to-one-paralogues.txt
-```
-
 ```{r load_data}
+# one-to-one-paralogues.txt is file produced from Ensembl Biomart
 paraloguesFile <- file.path(rootPath, 'dataFiles', 'one-to-one-paralogues.txt' )
 colNames <- c("paralogue1ID", "paralogue1Name", "paralogue2Name", "paralogue2ID",
-              "homologyType", "lastCommonAncestor", "gene1.pc.ID", "gene2.pc.ID" )
+                                "homologyType", "lastCommonAncestor", "gene1.pc.ID", "gene2.pc.ID" )
 paraloguesData <- read.table(paraloguesFile, sep="\t",
                              col.names = colNames)
 
