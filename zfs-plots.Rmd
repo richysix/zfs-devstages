@@ -83,13 +83,14 @@ if( file.exists(DeseqDataFile) ){
   colnames(countData) <- gsub(".count", "", colnames(countData) )
   rownames(countData) <- rnaseqData[[geneIdColumnName]]
   
-  # the samples file contains two columns
-  # sample name used for sequencing
-  # condition which in this case is the ZFS stage id for the stage that the sample was collected at
-  # rnaseqSampleFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'samples.txt')
-  # rnaseqSampleData <- read.table(rnaseqSampleFile, sep="\t", header=TRUE,
-  #                          col.names = c('sample', 'condition'),
-  #                          colClasses = c('character', 'factor') )
+  # the samples file contains 7 columns
+  # sample: internal sample name used for sequencing
+  # public_name: sample name in ENA
+  # accession_number: ENA sample accession number
+  # condition: ZFS stage id for the stage that the sample was collected at
+  # stage: stage name from ZFIN.org
+  # stageName: shorted name with prefixes removed
+  # sampleName: sample name composed of stage name and arbitrary number
   rnaseqSampleFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'zfs-rnaseq-sampleInfo.tsv')
   rnaseqSampleInfo <- read.table(rnaseqSampleFile, sep="\t", header=TRUE,
                            colClasses = c('character', 'character', 'character', 
@@ -99,32 +100,6 @@ if( file.exists(DeseqDataFile) ){
                                         levels = unique(rnaseqSampleInfo$stageName) )
   # set sample names to be row names of sample info
   rownames(rnaseqSampleInfo) <- rnaseqSampleInfo$sampleName
-
-  #   # the stages file contains the mapping from ZFS stage id to stage name
-  # # the ZFS id column is labelled condition to match the samples file
-  # rnaseqStageInfoFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'stages.txt')
-  # rnaseqStageInfo <- read.table(rnaseqStageInfoFile, sep="\t",
-  #                        col.names = c("condition", "stage") )
-  # # order levels of stage by order of ZFS ids
-  # rnaseqStageInfo$stage <- factor( rnaseqStageInfo$stage,
-  #   levels = rnaseqStageInfo$stage[ order(rnaseqStageInfo$condition) ] )
-  # # remove prefixes such and Cleavage and Blastula
-  # rnaseqStageInfo$stage <- gsub(" ", "-", rnaseqStageInfo$stage) # change spaces to hyphens
-  # rnaseqStageInfo$stageName <- gsub("^.*:", "", rnaseqStageInfo$stage) # remove prefixes
-  # 
-  # # order levels of stageName by order of ZFS ids
-  # rnaseqStageInfo$stageName <- factor( rnaseqStageInfo$stageName,
-  #   levels = rnaseqStageInfo$stageName[ order(rnaseqStageInfo$condition) ] )
-  # # join stage info to sample info
-  # # joins on condition (ZFS ids)
-  # rnaseqSampleInfo <- merge(rnaseqSampleData, rnaseqStageInfo )
-  # # droplevels from stage and stageName and ZFS id
-  # rnaseqSampleInfo <- droplevels(rnaseqSampleInfo)
-  # 
-  # # make new human readable sample names by combining stage name and arbitrary number
-  # rnaseqSampleInfo$sampleName <- paste( rnaseqSampleInfo$stageName, 
-  #                     rep( seq_len(5), nlevels(rnaseqSampleInfo$condition ) ), 
-  #                     sep="-" )
 
   # order count data in stage order
   colorder <- sapply( rnaseqSampleInfo$sample, 
@@ -171,16 +146,9 @@ if( file.exists(detctDataFile) ){
   rownames(detctSampleInfo) <- detctSampleInfo$sample
   # order by countData column names
   detctSampleInfo <- detctSampleInfo[ colnames(countData), ]
-  # # set levels of sample
-  # detctSampleInfo$sample <- factor( detctSampleInfo$sample,
-  #                                 levels = detctSampleInfo$sample )
   # set levels of stageName
   detctSampleInfo$stageName <- factor( detctSampleInfo$stageName,
                                   levels = unique(detctSampleInfo$stageName) )
-  # # set levels of sampleName
-  # detctSampleInfo$sampleName <- factor( detctSampleInfo$sampleName,
-  #                                 levels = unique(detctSampleInfo$sampleName) )
-
   # relabel colnames with sample names
   colnames(countData) <- detctSampleInfo$sampleName
   colnames(countData) <- 
@@ -237,15 +205,6 @@ detctReadData <- read.table(file=detctReadDataFile, sep="\t", header=FALSE)
 colnames(detctReadData) <- c('sample', 'value')
 detctReadData$sampleType <- factor( rep('DETCT', nrow(detctReadData) ),
                                    levels = c('RNA-Seq', 'DETCT') )
-# # sample info
-# detctSampleInfoFile <- file.path(rootPath, 'dataFiles', 'detct', 'sampleInfo.tsv')
-# detctSampleInfo <- read.table(file=detctSampleInfoFile, sep="\t", header=TRUE)
-# # reorder levels of stage name and sample name
-# detctSampleInfo$stageName <- factor(detctSampleInfo$stageName,
-#                                     levels=unique(detctSampleInfo$stageName))
-# detctSampleInfo$sampleName <- factor(detctSampleInfo$sampleName,
-#                                      levels=unique(detctSampleInfo$sampleName))
-
 detctReadDataMerged <- merge(detctReadData, detctSampleInfo)
 ```
 
@@ -371,15 +330,21 @@ varPCThreshold <- 1
 varRegionThreshold <- 0.01
 sampleNames <- FALSE
 
-# function to plot arbitrary PCs against each other
-#' Name
-#' Summary
+#' PCA_plot
+#' function to plot arbitrary PCs against each other
 #' 
-#' Description
+#' This function takes the object produced by prcomp and plots a scatterplot of
+#'   two of the principal components against each other. 
 #'    
-#' @param counts A numeric matrix of raw feature counts i.e.
+#' @param pca The object returned by prcomp
+#' @param propVarPC A vector of the proportions of variance explained by each component
+#' @param firstPC the index of the first compoenent to plot
+#' @param secondPC optionally the index of the second component to plot
+#'    if NULL, then it defaults to firstPC + 1
+#' @param DESeqTrans The DESeqTrans object used to create the PCA
+#' @param sampleNames a character vector of optional sample names to be plotted next to the points
 #'
-#' @return tpm A numeric matrix normalized by library size and feature length
+#' @return plot A ggplot2object of the scatterplot
 
 PCA_plot <- function( pca, propVarPC, firstPC, secondPC = NULL, DESeqTrans, sampleNames = NULL ){
   secondPC <- ifelse(is.null(secondPC), firstPC + 1, secondPC )
@@ -411,15 +376,24 @@ PCA_plot <- function( pca, propVarPC, firstPC, secondPC = NULL, DESeqTrans, samp
   return(pcaPlot)
 }
 
-#' Name
-#' Summary
+#' runPCA
+#' A function to run principal component analysis (PCA) and create plots of the prinicipal components
+#' plotted against each other
 #' 
-#' Description
+#' This functions takes a DESeqDataSet object and a DESeqTransform object and 
+#'    a number of regions to use and runs PCA on the tramsformed counts
+#'    and produces a plot of of each component plotted against the next
+#'    for all components that explain over a certain amount of variance (varPCThreshold)
 #'    
-#' @param counts A numeric matrix of raw feature counts i.e.
+#' @param DESeqObj DESeqDataSet object
+#' @param DESeqTransObj DESeqTransform object to use for PCA
+#' @param regionCount integer, the number of regions to included when running the PCA
 #'
-#' @return tpm A numeric matrix normalized by library size and feature length
-
+#' @return list containing
+#'    the object returned from prcomp
+#'    a list of the PC plots
+#'    a list of the regions contibuting to each component
+#'
 runPCA <- function( DESeqObj, DESeqTransObj, regionCount ){
   # run PCA on transformed data (DESeq2 Rlog or VST transforms)
   rv <- rowVars(assay(DESeqTransObj))
@@ -443,23 +417,7 @@ runPCA <- function( DESeqObj, DESeqTransObj, regionCount ){
       genesForPCsList[[i]] <- topData[ , !grepl('variance explained', colnames(data) ) ]
   }
 
-  # # Write PCs to PDF
-  # plotList <- vector( "list", length = sum(propVarPC * 100 >= varPCThreshold) + 1 )
-  # pdf(pdfFile)
-  # 
-  # # Show variance explained for each PC
-  # d <- data.frame(PC=seq.int(length(propVarPC)), var=propVarPC)
-  # varPlot1 <- ggplot(data=d, aes(x=PC, y=var)) + geom_line() + geom_point() +
-  #                 xlab("PC") + ylab("Variance explained") + ylim(c(0, 1))
-  # print(varPlot1)
-  # plotList[[1]] <- varPlot1
-  # varPlot2 <- ggplot(data=d, aes(x=PC, y=cumsum(var))) + geom_line() + geom_point() +
-  #     xlab("PC") + ylab("Cumulative variance explained") + ylim(c(0, 1))
-  # print(varPlot2)
-  # plotList[[2]] <- varPlot2
-  
   # Plot PCs in pairs
-  # short_sample_names <- remove_common_prefix(colnames(DESeqTransObj))
   plotList <- vector( "list", length = sum(propVarPC * 100 >= varPCThreshold) - 1 )
   for (i in seq.int(sum(propVarPC * 100 >= varPCThreshold) - 1)) {
       first <- i
@@ -481,6 +439,7 @@ runPCA <- function( DESeqObj, DESeqTransObj, regionCount ){
 ```
 
 ```{r pca_all_regions}
+# run PCA on all regions
 regionCount <- nrow(rnaseqData)
 pcaObj <- runPCA( dds, ddsRlog, regionCount )
 pcaPlotList <- pcaObj$plots
@@ -687,14 +646,16 @@ tpm <- counts_to_tpm(counts(dds), TxLengths, insertSizes)
 #### Distribution of mean TPM by stage
 
 ```{r tpm_dist}
-#' Name
-#' Summary
+#' meanByStage
+#' Calculates the mean expression for each gene for a given stage
 #' 
-#' Description
+#' This function takes a stage name and the count data and 
+#'    calculates the mean expression for each gene at that stage
 #'    
-#' @param counts A numeric matrix of raw feature counts i.e.
+#' @param stageName character, the name of the stage to calculate for
+#' @param countData matrix the count data to calculate on
 #'
-#' @return tpm A numeric matrix normalized by library size and feature length
+#' @return data.frame with columns stage and meanExpr
 meanByStage <- function( stageName, countData ){
   stageCounts <- countData[ , grepl(stageName, colnames(countData)) ]
   data.frame(
@@ -702,7 +663,7 @@ meanByStage <- function( stageName, countData ){
     meanExpr = rowMeans(stageCounts)
   )
 }
-
+# calculate mean TPM for each gene for each stage
 meanTpmList <- lapply(as.list(levels(colData(dds)$stageName)),
     meanByStage, tpm
   )
@@ -743,14 +704,15 @@ print(genesDistPlot)
 #### PCA Matrix Plot
 
 ```{r exprPlotFunctions}
-#' Name
-#' Summary
+#' clusterGenes
+#' Function to cluster rows (genes) of a count matrix
 #' 
-#' Description
+#' This function takes a count matrix, runs hierarchical clustering on it and 
+#'    reorders the matrix based on the result
 #'    
-#' @param counts A numeric matrix of raw feature counts i.e.
+#' @param counts A numeric matrix of counts
 #'
-#' @return tpm A numeric matrix normalized by library size and feature length
+#' @return the count matrix reordered based on the result of the clustering
 
 clusterGenes <- function( counts ){
   distMatrix <- as.dist( 1 - abs( cor(t(counts)) ) )
@@ -766,15 +728,24 @@ clusterGenes <- function( counts ){
   counts <- counts[ newClust$order, ]
 }
 
-#' Name
-#' Summary
+#' exprHeatmap
+#' function to plot an expression heatmap using ggplot2
 #' 
-#' Description
+#' This is designed to plot a heatmap of a subset of the genes contributing 
+#'    to a particular prinicpal component. It expects the list of genes contributing 
+#'    to PCs returned by runPCA and the PC number. You can optionally change the 
+#'    number of genes plotted and whether to cluster the subset before plotting
 #'    
-#' @param counts A numeric matrix of raw feature counts i.e.
+#' @param PCNum integer, index of the PC to plot
+#' @param PCDataList list, list of genes contributing to principal components
+#'    as returned by runPCA
+#' @param numGenes integer, number of genes to plot (ordered by their contribution to the component)
+#'    default: 100
+#' @param cluster logical, whether to cluster the genes before plotting
+#'    default: TRUE
 #'
-#' @return tpm A numeric matrix normalized by library size and feature length
-
+#' @return Heatmap A ggplot2 object
+#'
 exprHeatmap <- function( PCNum, PCDataList, numGenes = 100, cluster = TRUE ){
   dataForPC <- PCDataList[[PCNum]]
   counts <- log10( dataForPC[ seq_len(numGenes), ] + 1 )
@@ -800,15 +771,22 @@ exprHeatmap <- function( PCNum, PCDataList, numGenes = 100, cluster = TRUE ){
 ```
 
 ```{r pcaMatrixPlot}
-#' Name
-#' Summary
+#' PCA_matrixPlot
+#' Plot a matrix of plots representing all the principal components
 #' 
-#' Description
+#' Plot a matrix of plots for the principal components returned by runPCA.
+#'    The plots on the diagonal are heatmaps of the top 100 genes contributing to the PC
+#'    Under the diagonal are scatterplots of the components plotted against each other
+#'    For example, the plot in column 1, row 2 is PC1 on the x-axis plotted against
+#'    PC 2 on the y-axis
 #'    
-#' @param counts A numeric matrix of raw feature counts i.e.
+#' @param PCDataList list, list of genes contributing to principal components
+#' @param pca object returned by prcomp 
+#' @param ddsRlog DESeqTransform, Rlog transformed data
+#' @param ... other parameters passed to exprHeatmap
 #'
 #' @return tpm A numeric matrix normalized by library size and feature length
-
+#'
 PCA_matrixPlot <- function( PCDataList, pca, ddsRlog, ... ){
   matrixPlotList <- vector( "list", length = length(PCDataList) * length(PCDataList) )
   propVarPC <- pca$sdev^2 / sum( pca$sdev^2 )
@@ -932,26 +910,38 @@ tpmFilt <- tpm[ genesToKeep, ]
 ```
 
 ```{r cluster_func}
-# getGenesForStage
-# return counts by index
-# ARGS:
-# stageIndex = integer
-# countsScaled = counts matrix to subset (rows = Stage x cols = Genes)
-# maxMeanIndices = vector of indices indicating the stage for max expression
-# same length as cols of countsScaled
-# RETRUNS:
-# subsetted matrix
+#' getGenesForStage
+#' Return the counts for a given stage index
+#' 
+#' Return the columns of a matrix using a vector of assigned indices and 
+#'    the desired index. In this function the columns are genes and 
+#'    the rows are samples.
+#'
+#' @param stageIndex integer, 
+#' @param countsScaled matrix, counts matrix to subset (rows = Stage x cols = Genes)
+#' @param maxMeanIndices integer, vector of indices indicating the stage for max expression
+#'    same length as cols of countsScaled
+#'
+#' @return matrix subset using the indices
+#'
 getGenesForStage <- function( stageIndex, countsScaled, maxMeanIndices ){
   countsScaled[ , maxMeanIndices == stageIndex ]
 }
 
-# clusterByGenes
-# do optimal ordering of hierarchical clustering
-# ARGS:
-# stageIndex = integer
-# countsByStageList = list, as produced by getGenesForStage (rows = stage x cols = genes)
-# basename = overall basename for plots
-clusterByGenes <- function( stageIndex, countsByStageList, basename ){
+#' clusterByGenes
+#' Cluster and order a count matrix
+#' 
+#' Cluster the supplied count matrix by columns (Genes). The counts are first scaled 
+#'    and then clustered using Pearson's correlation coefficient as a distance measure.
+#'    The leaves of the reulsting tree are then reordered using the order.optimal function from the cba package.
+#'    The count matrix is then reordered using this ordering and returned
+#'
+#' @param stageIndex integer, the index of the counts list to run clustering on
+#' @param countsByStageList list, counts matrices to cluster (rows = Stage x cols = Genes)
+#'
+#' @return matrix reordered by clustering
+#'
+clusterByGenes <- function( stageIndex, countsByStageList ){
   stageCounts <- countsByStageList[[stageIndex]]
   stagename <- levels(rnaseqSampleInfo$stageName)[stageIndex]
   stagename <- gsub("%", "pc", stagename)
@@ -963,29 +953,29 @@ clusterByGenes <- function( stageIndex, countsByStageList, basename ){
   hClust <- hclust(distanceMatrix)
   # find optimal ordering of leaves
   optOrder <- order.optimal(distanceMatrix, hClust$merge)
-  # plot tree and cor matrix
+  # reorder counts matrix
   newClust <- hClust
   newClust$merge <- optOrder$merge
   newClust$order <- optOrder$order
-  scaledCounts <- scaledCounts[ , newClust$order]
   stageCounts <- stageCounts[ , newClust$order]
-  geneCor <- geneCor[ newClust$order, newClust$order ]
-  
-  # plotClustering( paste(basename, stagename, sep='.'), scaledCounts, hClust, newClust, distanceMatrix, geneCor )
-  # 
+
   return(stageCounts)
 }
 ```
 
 ```{r heatmapFunction}
-# FUNCTION: ggplotExprHeatmap
-# ARGS:
-# exprMatrix: matrix of values to plot as heatmap
-#             row are genes
-#             columns are samples
-#             values are counts/tpm
-# RETURNS:
-# Heatmap: ggplot object
+#' ggplotExprHeatmap
+#' function to plot an expression heatmap using ggplot2
+#' 
+#' This is designed to plot an expression heatmap of a count matrix. 
+#'    The colour scheme is a gradient from blue through yellow to red
+#'    
+#' @param exprMatrix matrix, count matrix to plot
+#'    rows are genes, columns are samples
+#' @param legendPosition character, one of 'left', 'right', 'top' or 'bottom'
+#'
+#' @return Heatmap ggplot2 object
+#'
 ggplotExprHeatmap <- function( exprMatrix, legendPosition = 'left' ){
   # reshape data for heatmap
   exprMatrix.m <- melt(exprMatrix)
@@ -1297,6 +1287,21 @@ for( ontology in c('BP', 'CC', 'MF') ){
   id2GOList[[ontology]] <- readMappings(file = mapFile)
 }
 
+#' runTopGO
+#' function to run GO enrichment using topGO
+#' 
+#' Takes the counts list split by stage and a stage index and runs GO enrichment
+#'    using topGO on the gene set in the counts matrix.
+#'    Outputs a file of results of the pvalue associated with each GO Term and
+#'    pdfs showing the position of the most significant terms within the GO graph
+#'    
+#' @param stageIndex integer, index of the gene set to use
+#' @param countsList list, list of count matrices split by stage
+#' @param ontologyClass character, one of 'BP', 'MF' or 'CC'
+#' @param allGenes character, named vector of the complete set of genes to compare to
+#'
+#' @return Heatmap ggplot2 object
+#'
 runTopGO <- function( stageIndex, countsList, ontologyClass, allGenes ){
   stageSubset <- countsList[[stageIndex]]
   stageName <- levels(rnaseqSampleInfo$stageName)[stageIndex]
@@ -1348,6 +1353,18 @@ for( ontologyClass in c('BP', 'MF', 'CC') ){
   lapply(seq_len(length(tpmByStage)), runTopGO, tpmByStage, ontologyClass, allGenes )
 }
 
+#' outputStageGenes
+#' outputs of file of gene Ids with gene names for each stage
+#' 
+#' Joins the gene ids for the genes assigned to a stage to gene names and
+#'    outputs a file of gene name, gene Id pairs
+#'    
+#' @param stageIndex integer, index of the gene set to use
+#' @param countsList list, list of count matrices split by stage
+#' @param allGenes character, named vector of the complete set of genes to compare to
+#'
+#' @return Heatmap ggplot2 object
+#'
 outputStageGenes <- function( stageIndex, countsList, allGenes ){
   stageSubset <- countsList[[stageIndex]]
   stageName <- levels(rnaseqSampleInfo$stageName)[stageIndex]
@@ -1415,7 +1432,24 @@ orthologueCounts <- read.table(orthologueCountFile, header=FALSE,
                                sep="\t", col.names = c("geneId", "orthologueId", "species",
                                                        "lastCommonAncestor", "stage", "geneName",
                                                        "Named"))
-
+#' countOrthology
+#' Determine the largest taxonomic group for each gene with orthologues
+#' 
+#' Takes a data.frame for a gene id containing all the orthologues for
+#'    that gene from Ensembl and determines the oldest last common ancestor
+#'    out of 'Vertebrates', 'Teleosts' and 'Danio'
+#'    
+#' @param geneSubset data.frame, with columns 
+#'    "geneId"
+#'    "orthologueId"
+#'    "species"
+#'    "lastCommonAncestor"
+#'    "stage"
+#'    "geneName"
+#'    "Named"
+#'
+#' @return data.frame, containing columns 'geneId', 'stage', 'Phylum', 'Named'
+#'
 countOrthology <- function( geneSubset ){
   # LCA <- ''
   Phylum <- ''
@@ -1535,8 +1569,21 @@ clusters <- split(clusterData, clusterData$cluster)
 ```
 
 ```{r binomTest}
-# Function to run binomial test
-# binom test freq, cluster-size, prob, alt = greater
+#' binomTest
+#' Function to run binomial test
+#' 
+#' Performs a binomial test given the observed frequency, group size, 
+#'    probability of chosen from the category at random and a category name
+#'    
+#' @param freq integer, the observed number within the cluster
+#' @param clusterSize integer, the cluster size
+#' @param prob numeric, the probability of drawing an item from the 
+#'    tested category at random from the total set
+#' @param clusterName character, name of the cluster from which the observed counts come
+#' @param category character, name of the category of items being tested (e.g. Chr4)
+#'
+#' @return data.frame, containing columns 'Cluster', 'Category', 'Count', 'Expected', 'p.value'
+#'
 binomTest <- function( freq, clusterSize, prob, clusterName, category ){
   testRes <- binom.test(freq, clusterSize, p = prob, alternative = "greater")
   data.frame(
@@ -1640,12 +1687,25 @@ pfamDesc <- data.frame(
 ```{r get_chr4_genes}
 chr4Region = list( chr = "4", start = 24000000, end = NULL )
 
-  # connect to ensembl
-  # need the correct archive site 85 = jul2016.archive.ensembl.org
-  # to connect to the current database use
-  # ensBiomart <- useMart( "ensembl", dataset="drerio_gene_ensembl")
-  ensBiomart <- useMart(host='jul2016.archive.ensembl.org', biomart = "ENSEMBL_MART_ENSEMBL", dataset="drerio_gene_ensembl")
+# connect to ensembl
+# need the correct archive site 85 = jul2016.archive.ensembl.org
+# to connect to the current database use
+# ensBiomart <- useMart( "ensembl", dataset="drerio_gene_ensembl")
+ensBiomart <- useMart(host='jul2016.archive.ensembl.org', biomart = "ENSEMBL_MART_ENSEMBL", dataset="drerio_gene_ensembl")
 
+#' getGenesForRegion
+#' Function to extract the genes within a genomic range
+#' 
+#' Performs a binomial test given the observed frequency, group size, 
+#'    probability of chosen from the category at random and a category name
+#'    
+#' @param chr character, name of the chromosome
+#' @param start integer, start of the region (default: 1)
+#' @param end integer, end of the region (default: max position for the chr in the data)
+#' @param AllGenesInfo data.frame, name of the cluster from which the observed counts come
+#'
+#' @return data.frame, gene info from Ensembl with geneId, gene name, chr, start and end
+#'
 getGenesForRegion <- function(chr, start = 1, end = NULL, AllGenesInfo){
   if( is.null( end ) ){
     end <- max( AllGenesInfo$end_position[ AllGenesInfo$chromosome_name == chr ] )
@@ -1656,7 +1716,20 @@ getGenesForRegion <- function(chr, start = 1, end = NULL, AllGenesInfo){
   return( chr_specific_genes )
 }
 
-
+#' getGenesAndPfam
+#' Function to extract the genes within a genomic range and get
+#'    information on PFAM domains
+#' 
+#' Retrieves PFAM domain information for the genes within the supplied genomic interval 
+#'    
+#' @param biomartObj, biomaRt object from connecting to Ensembl bioMart
+#' @param chr character, name of the chromosome
+#' @param start integer, start of the region (default: 1)
+#' @param end integer, end of the region (default: max position for the chr in the data)
+#' @param pfamDesc data.frame, mapping of PFAM accession numbers to descriptions
+#'
+#' @return data.frame, contains information on the genes and the associated PFAM domains
+#'
 getGenesAndPfam <- function( biomartObj, chr, start = 1, end = NULL, pfamDesc ){
   chr_specific_genes <- getGenesForRegion(chr, start = start, end = end, AllGenesInfo)
   # get gene/Pfam info from Biomart
@@ -1752,15 +1825,21 @@ kable( sigClusterResults, row.names = FALSE, align = c('l', 'l', 'r', 'r', 'r', 
 Table showing clusters with significant enrichments (adjusted p-value < 0.05).
 
 ```{r funcs}
-# cluster_and_plot_tpms
-# ARGS
-# tpms: matrix/data.frame of tpms
-# rows: a character vector of rownames to select. Default = ALL
-# columns: integer vector of columns to select, Default = 1:90
-# cluster: logical indicating whether to do hierarchical clustering. Default = TRUE
-# plot: logical indicating whether to produce a heatmap plot. Default = TRUE
-# RETURNS
-# 
+#' cluster_and_plot_tpms
+#' Function to cluster supplied tpm matrix and plot a heatmap
+#' 
+#' Takes a matrix and clusters and plots a ggplot2heatmap
+#'    
+#' @param tpms matrix, matrix of TPM, rows are genes, columns are samples
+#' @param row integer, rows to subset to
+#' @param columns integer, columns to subset to
+#' @param cluster logical, whether to cluster the rows or not
+#' @param plot logical, whether to create heatmap plot or not
+#' @param distance_measure character, distance measure to use
+#' @param reverseGenes logical, whether to reverse the gene order for plotting
+#'
+#' @return list, containing tpm, tpm.m, plot, tree
+#'
 cluster_and_plot_tpms <- function( tpms, rows = NULL, columns = 1:90, cluster = TRUE, plot = TRUE, distance_measure = "pearson", reverseGenes = FALSE ){
   # subset to supplied rows and columns
   # 
@@ -1796,12 +1875,6 @@ cluster_and_plot_tpms <- function( tpms, rows = NULL, columns = 1:90, cluster = 
     newClust$merge <- optOrder$merge
     newClust$order <- optOrder$order
     
-    # # plot original ordering and optimal ordering
-    # plot(hClust, main="Default hclust ordering", labels=FALSE)
-    # plot(newClust, main="Optimal ordering", labels=FALSE)
-    # implot(distMatrix[[hClust$order]])  
-    # implot(distMatrix[[newClust$order]])
-    
     # order genes by optimal ordering
     tpmMat <- tpms[ newClust$order, ]
   }
@@ -1812,13 +1885,6 @@ cluster_and_plot_tpms <- function( tpms, rows = NULL, columns = 1:90, cluster = 
     } else{
       gene_idLevels <- row.names(tpmMat)
     }
-    # tpms.m <- cbind(
-    #   gene_id = factor( row.names(tpmMat),
-    #                     levels = gene_idLevels ),
-    #   suppressMessages(
-    #     melt( tpmMat, variable.name = "sample")
-    #   )
-    # )
     if( class(tpmMat) == "data.frame" ){
       tpmMat <- as.matrix(tpmMat)
     }
@@ -1912,7 +1978,20 @@ nlrlogtpmsInfo <- cluster_and_plot_tpms( nlrlogtpms, cluster = FALSE )
 ```
 
 ```{r }
-# function to plot the expression of genes from a section (or all) of chromosome
+#' plotExprByChr
+#' Plot the expression of genes from a section (or all) of chromosome
+#' 
+#' Takes a genomic interval as chr, start, end and plots an expression heatmap
+#'    using the supplied matrix
+#'
+#' @param chr character, name of the chromosome
+#' @param start integer, start of the region (default: 1)
+#' @param end integer, end of the region (default: max position for the chr in the data)
+#' @param tpm matrix, matrix of TPM, rows are genes, columns are samples
+#' @param position logical, whether to plot genomic positions on the y-axis
+#'
+#' @return list, containing tpms, plot
+#'
 plotExprByChr <- function( chr, start = 1, end = NULL, position = TRUE, tpm = tpmByStageClustered ){
   chr_specific_genes <- getGenesForRegion(chr, start = start, end = end, AllGenesInfo)
   # sort by position
@@ -2235,6 +2314,7 @@ closeUpPlotList <- lapply( selectedRegions,
 # get max value
 maxValue <- log10( max( sapply( closeUpPlotList, function(x){ return( max(x$tpms) ) } ) ) )
 
+# This function adds gene names to the heatmap
 add_gene_names <- function( closeUpInfo ){
   geneLabels <- geneNames[ rownames(closeUpInfo$tpms) ]
   return( closeUpInfo$plot + scale_y_discrete(labels=geneLabels) +
@@ -2400,11 +2480,25 @@ Histogram of Pearson coefficients of a random selection of `r sampleSize` genes 
 ### Fig5C
 #### top10/bottom10 tpm heatmap
 ```{r plot_functions}
+# This function uses ggplotExprHeatmap to plot log10 tpm
 plotLog10Heatmap <- function( genes ){
   exprMatrix <- log10( as.matrix( tpm[ as.character( unlist(genes[1,1:2]) ), 1:90 ] ) + 1 )
   ggplotExprHeatmap( exprMatrix )
 }
 
+#' getExprData
+#' Retrieve expression data for paralogoues gene pairs
+#' 
+#' Takes a row from the pairwiseCor data.frame and retrieves the expression data.
+#'    The TPM can be logged or scaled but not both.
+#'    scale is the default, log takes priority
+#'
+#' @param genes data.frame, expects a row from the pairwiseCor data.frame
+#' @param log logical, whether to log the tpms first
+#' @param scale logical, whether to center and scale the tpms
+#'
+#' @return data.frame
+#'
 getExprData <- function( genes, log = FALSE, scale = TRUE ){
   exprMatrix <- as.matrix( tpm[ as.character( unlist(genes[1,1:2]) ), 1:90 ] )
   rownames(exprMatrix) <- as.character( unlist(genes[1,1:2]) )
@@ -2425,7 +2519,21 @@ getExprData <- function( genes, log = FALSE, scale = TRUE ){
   return(plotData)
 }
 
-plotLinegraph <- function( genes, log = FALSE, scale = TRUE  ){
+#' plotExprByStage
+#' Plot gene expression as points coloured by genes.
+#' 
+#' Takes a row from the pairwiseCor data.frame and retrieves the expression data.
+#'    Then plots the expression data with stage on the x-axis and 
+#'    expression value on the y-axis. The individual samples are plotted as points
+#'    coloured by gene.
+#'
+#' @param genes data.frame, expects a row from the pairwiseCor data.frame
+#' @param log logical, whether to log the tpms first
+#' @param scale logical, whether to center and scale the tpms
+#'
+#' @return plot, ggplot2 object
+#'
+plotExprByStage <- function( genes, log = FALSE, scale = TRUE  ){
   plotData <- getExprData( genes, log = log, scale = scale  )
   if( scale ){
     y_label <- "Expression (TPM - Mean Centered and SD scaled)"
@@ -2444,6 +2552,16 @@ plotLinegraph <- function( genes, log = FALSE, scale = TRUE  ){
   return(plot)
 }
 
+#' make_scatterplot
+#' Creates a scatterplot of the expression values of one gene against another
+#' 
+#' Takes a row from the pairwiseCor data.frame and retrieves the expression data.
+#'    Then plots the expression values for gene1 against those for gene2
+#'
+#' @param genes data.frame, expects a row from the pairwiseCor data.frame
+#'
+#' @return plot, ggplot2 object
+#'
 make_scatterplot <- function( genes ){
   plotData <- getExprData( genes, log = FALSE, scale = FALSE )
   pointsData <- dcast( plotData, Var1 + stageName ~ Var2, value.var = "value" )
@@ -2514,7 +2632,7 @@ print(top10_bottom10Heatmap)
 
 ```{r ckm_exprPlots, include=TRUE}
 ckm_genes <- highlyCor[ grepl("ckm[ab]", highlyCor$gene1Name ), ]
-ckm_plot <- plotLinegraph( ckm_genes, 
+ckm_plot <- plotExprByStage( ckm_genes, 
                               log = FALSE, scale = FALSE )
 ckm_plot <- ckm_plot + theme( plot.title = element_blank() )
 plotList <- add_to_plot_list( 
@@ -2540,7 +2658,7 @@ print(ckm_scatterplot)
 
 ```{r plot_as_linegraphs, include = TRUE}
 impdh1_genes <- negCor[ grepl("impdh1", negCor$gene1Name ), ]
-impdh1_plot <- plotLinegraph( impdh1_genes, 
+impdh1_plot <- plotExprByStage( impdh1_genes, 
                               log = FALSE, scale = FALSE )
 impdh1_plot <- impdh1_plot + theme( plot.title = element_blank() )
 plotList <- add_to_plot_list( 
