@@ -1535,23 +1535,6 @@ print(NamedStackedPC)
 print(UnnamedStackedPC)
 ```
 
-## Figure 4
-
-```{r set_colour_palette}
-colPalette <- c(
-  "Cluster001" = "#F3756D", 
-  "Cluster002" = "#D69029", 
-  "Cluster003" = "#36AAE1",
-  "Cluster004" = "#94A3BE",
-  "Cluster005" = "#16BCC2",
-  "Cluster006" = "#8D8CC4",
-  "Cluster009" = "#ED66A6",
-  "Cluster022" = "#5EBB47",
-  "Cluster037" = "#97543B",
-  "Cluster084" = "#363A4D"
-)
-```
-
 ```{r loadClusterData}
 # read in cluster data
 clusterFile <- file.path(rootPath, 'dataFiles', 'biolayout.GRCz10.publication_change_with_stage_r-0.94.cluster.info.txt')
@@ -1561,6 +1544,81 @@ rownames(clusterData) <- as.character( clusterData$gene_id )
 # split clusterData by cluster
 clusters <- split(clusterData, clusterData$cluster)
 ```
+
+### Figure 3-2
+
+#### Effect of Normalisation on cluster 11
+
+```{r normalisation_check, include=TRUE}
+dataFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'spikes-counts.txt')
+spikesData <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"",
+                         row.names = 1 )
+
+# relabel colnames with sample names
+colnames(spikesData) <- rownames(rnaseqSampleInfo)
+
+# make DESeq object and estimate size factors
+spikesDESeqDataSet <- DESeqDataSetFromMatrix(spikesData, rnaseqSampleInfo, design = ~ condition)
+spikesDESeqDataSet <- estimateSizeFactors(spikesDESeqDataSet)
+
+# replace size factors in dds with the spike-derived ones
+ddsSpikeNormalised <- dds
+sizeFactors(ddsSpikeNormalised) <- sizeFactors(spikesDESeqDataSet)
+
+cluster11tpm <- tpm[ rownames( clusterData[ clusterData$cluster == "Cluster011", ] ), ]
+# center and scale. scale works on columns. 
+# need to transpose, scale then transpose back to scale rows (genes).
+cluster11tpmScaled <- t( scale( t(cluster11tpm) ) )
+cluster11tpmMeanByStage <- data.frame(
+  Sample = factor( colnames(cluster11tpm),
+                   levels = rnaseqSampleInfo$sampleName),
+  Measure = rep("TPM", ncol(cluster11tpm)),
+  Mean = colMeans(cluster11tpmScaled)
+)
+
+cluster11NormCounts <- counts(dds, normalized = TRUE )[ rownames( clusterData[ clusterData$cluster == "Cluster011", ] ), ]
+# center and scale. scale works on columns. 
+cluster11NormCountsScaled <- t( scale( t(cluster11NormCounts) ) )
+cluster11NormCountsMeanByStage <- data.frame(
+  Sample = factor( colnames(cluster11NormCounts),
+                   levels = rnaseqSampleInfo$sampleName),
+  Measure = rep("Library Size", ncol(cluster11NormCounts)),
+  Mean = colMeans(cluster11NormCountsScaled)
+)
+
+cluster11SpikeNormCounts <- counts(ddsSpikeNormalised, normalized = TRUE )[ rownames( clusterData[ clusterData$cluster == "Cluster011", ] ), ]
+# center and scale. scale works on columns. 
+cluster11SpikeNormCountsScaled <- t( scale( t(cluster11SpikeNormCounts) ) )
+cluster11SpikeNormCountsMeanByStage <- data.frame(
+  Sample = factor( colnames(cluster11SpikeNormCounts),
+                   levels = rnaseqSampleInfo$sampleName),
+  Measure = rep("ERCC spikes", ncol(cluster11SpikeNormCounts)),
+  Mean = colMeans(cluster11SpikeNormCountsScaled)
+)
+
+normalisationData <- rbind( cluster11tpmMeanByStage, 
+                            # cluster11CountsMeanByStage,
+                            cluster11NormCountsMeanByStage, 
+                            cluster11SpikeNormCountsMeanByStage )
+normalisationData$Measure <- factor(normalisationData$Measure,
+                                    levels = c("TPM", "ERCC spikes", "Library Size") )
+
+cluster11Linegraph <- ggplot( data = normalisationData ) + 
+  geom_line( aes( x = Sample, y = Mean, colour = Measure, group = Measure ), 
+             size = 1 ) + 
+  scale_colour_manual(values=c("steelblue3", "firebrick3", "#D3C04A")) +
+  theme_minimal() + theme( axis.text.x = element_text(angle=90, hjust=1, size=rel(0.5)),
+                           legend.position = "top" ) +
+  labs(y='Mean (Centred and Variance Scaled)' )
+
+pdf(file.path(rootPath, 'plots', 'Figure.3-2.pdf'))
+print(cluster11Linegraph)
+dev.off()
+
+print(cluster11Linegraph)
+```
+
+## Figure 4
 
 ```{r binomTest}
 #' binomTest
@@ -1911,6 +1969,21 @@ cluster_and_plot_tpms <- function( tpms, rows = NULL, columns = 1:90, cluster = 
   }
   return( returnList )
 }
+```
+
+```{r set_colour_palette}
+colPalette <- c(
+  "Cluster001" = "#F3756D", 
+  "Cluster002" = "#D69029", 
+  "Cluster003" = "#36AAE1",
+  "Cluster004" = "#94A3BE",
+  "Cluster005" = "#16BCC2",
+  "Cluster006" = "#8D8CC4",
+  "Cluster009" = "#ED66A6",
+  "Cluster022" = "#5EBB47",
+  "Cluster037" = "#97543B",
+  "Cluster084" = "#363A4D"
+)
 ```
 
 ```{r znf_log10TPM_heatmap, include=TRUE}
