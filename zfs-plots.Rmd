@@ -852,15 +852,13 @@ detctSampleCor.m$Var2 <- factor( detctSampleCor.m$Var2,
   )
 # plot correlation matrix
 detctSampleCorHeatmap <- ggplot(data = detctSampleCor.m) + 
-  geom_tile( aes( x = Var1, y = Var2, fill = value ),
-               colour = "grey60" ) + 
+  geom_tile( aes( x = Var1, y = Var2, fill = value ) ) + 
   scale_fill_gradientn( colours = c("blue", "yellow", "red"),
                         guide = guide_colorbar(title = "Correlation\nCoefficient\n(Pearson)") ) + 
   theme_void() + theme( legend.position="right",
                         legend.title = element_text(colour='black' ),
                         axis.text.x = element_text(colour='black', angle = 90, 
                                                    size = 0.5, hjust = 1 ) )
-
 
 plotList <- add_to_plot_list( plotList, 
                               detctSampleCorHeatmap, file.path(rootPath, 'plots', 'Figure.1-3.pdf') )
@@ -876,7 +874,7 @@ print(detctSampleCorHeatmap)
 detctpcaObj <- runPCA( detctDESeqDataSet, detctDESeqDataSetVst, nrow(detctDESeqDataSetVst) )
 detctpcaPlotList <- detctpcaObj$plots
 detctPCDataList <- detctpcaObj$PCData
-detctMatrixPlotList <- PCA_matrixPlot( PCDataList, detctpcaObj$pca, 
+detctMatrixPlotList <- PCA_matrixPlot( detctPCDataList, detctpcaObj$pca, 
                                        detctDESeqDataSetVst, numGenes = 100 )
 
 ggsave(file.path(rootPath, 'plots', 'Figure.1-4.pdf'), 
@@ -1014,7 +1012,7 @@ names(GenesPerStage) <- levels(rnaseqSampleInfo$stageName)
 tpmByStage <- lapply( seq_len(nlevels(rnaseqSampleInfo$stageName)), getGenesForStage, t(tpmFilt), maxMeanIndices )
 
 # cluster the genes inside each stage
-tpmByStageClusteredList <- lapply( seq_len(length(tpmByStage)), clusterByGenes, tpmByStage, 'tpm' )
+tpmByStageClusteredList <- lapply( seq_len(length(tpmByStage)), clusterByGenes, tpmByStage )
 # join back together and transpose
 tpmByStageClustered <- do.call(cbind, tpmByStageClusteredList)
 tpmByStageClustered <- t(tpmByStageClustered) # rows are now genes
@@ -1488,10 +1486,6 @@ orthologueCount <- do.call("rbind",
         countOrthology
   )
 )
-
-orthologueCountPlot <- ggplot( data = orthologueCount ) + 
-  geom_bar( aes( x = stage, fill = Phylum ), position = "dodge" ) +
-  facet_wrap( ~ Named )
 
 countsByStageByPhylumByNamed <- ddply( orthologueCount, .(stage, Phylum, Named), summarise, count = length(Phylum) )
 countsSplitByStageByNamed <- split(countsByStageByPhylumByNamed, list(countsByStageByPhylumByNamed$stage, countsByStageByPhylumByNamed$Named))
