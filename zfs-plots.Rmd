@@ -52,7 +52,7 @@ geneIdColumnName <- paste0('e', ensVersion, '.Ensembl.Gene.ID')
 ###################################
 
 # Later on we will need information on transcript lengths as well as gene names for gene ids
-# Get for existence of GTF file
+# Check for existence of GTF file
 # If not download it from Ensembl
 
 # check whether the gtf file exists
@@ -76,6 +76,9 @@ if( file.exists(DeseqDataFile) ){
   load(DeseqDataFile)
 } else {
   dataFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'zfs-rnaseq-grcz10.tsv')
+  if( !file.exists(dataFile) ){
+    stop("RNA-seq counts data file is not present! Please download from figshare. See README.")
+  }
   rnaseqData <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"")
   # data contains columns including gene information and then a column of counts for each sample
   # countData is just the counts columns
@@ -131,6 +134,9 @@ if( file.exists(detctDataFile) ){
   load(detctDataFile)
 } else {
   dataFile <- file.path(rootPath, 'dataFiles', 'detct', 'zfs-detct-grcz10.tsv')
+  if( !file.exists(dataFile) ){
+    stop("DETCT counts data file is not present! Please download from figshare. See README.")
+  }
   detctData <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"",
                      comment.char = "%")
   rownames(detctData) <- paste(detctData[,1], detctData[,2], detctData[,3], detctData[,5], sep=":")
@@ -1809,19 +1815,7 @@ chr4_ZnF_geneInfo <- chr4_ZnF_geneInfo[ order(chr4_ZnF_geneInfo$start_position),
 chr4ZnFData <- unique(chr4_ZnF_geneInfo[ , 1:5 ])
 ```
 
-```{bash chr4_ZnFs, eval=FALSE}
-# This takes the file of ZnF genes from chromsome 4 and which has multiple lines for each gene
-# and produces a list of unique gene ids sorted by chromsome and start position
-head -n1 dataFiles/rnaseq/chr4_ZnF.txt > dataFiles/rnaseq/chr4_ZnF.uniq.txt
-sort -k1,1 -u dataFiles/rnaseq/chr4_ZnF.txt | sort -t$'\t' -k2,2 -k3,3n >> \
-dataFiles/rnaseq/chr4_ZnF.uniq.txt
-```
-
 ```{r chr4_ZnF, include=TRUE}
-# # read in ZnF/NLR data
-# chr4ZnFFile <- file.path('dataFiles', 'rnaseq', 'chr4_ZnF.uniq.txt')
-# chr4ZnFData <- read.table(chr4ZnFFile, sep="\t", header=TRUE)
-
 # ZnF genes in clusters
 ZnFs <- clusterData[ as.character(chr4ZnFData$ensembl_gene_id), ]
 ZnFs <- ZnFs[ !is.na(ZnFs$name), ]
