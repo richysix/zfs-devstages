@@ -240,10 +240,51 @@ rnaseqQortsData.m <- melt(rnaseqQortsData, id.vars="FIELD", variable.name="sampl
 rnaseqQortsData.m <- rnaseqQortsData.m[ , !grepl("FIELD", colnames(rnaseqQortsData.m)) ]
 
 rnaseqQortsData.m$sampleType <- factor( rep('RNA-Seq', nrow(rnaseqQortsData.m) ),
-                                   levels = c('RNA-Seq', 'DETCT') )
+                                   levels = c('RNA-Seq', 'DETCT single', 'DETCT pool') )
 
 # merge molten data and sample info
 rnaseqQortsData.stage.m <- merge(rnaseqQortsData.m, rnaseqSampleInfo)
+
+numGenesPlotRNAseq <- ggplot(data = rnaseqGDData, aes(x = stageName, y = genes, fill = stageName) ) +
+  geom_boxplot(outlier.shape=NA, size = 0.2 ) +
+  scale_fill_manual(values = colourPalette) +
+  labs(x="Stage", y=paste0("Genes Detected (>= ", rnaseqTpmThreshold, " TPM)") ) +
+  theme_minimal() +
+  theme( axis.text.x = element_text(colour = "black", angle = 90, vjust = 0.4, hjust = 1) )
+
+# box plot of just RNA-seq data
+readPairsBoxPlot <- ggplot(data = rnaseqQortsData.stage.m, aes(x = stageName, y = value) ) +
+  geom_boxplot(outlier.shape=NA, size = 0.2 ) +
+  scale_y_continuous(labels = function(x){ sprintf('%.0f', x/1000000) }) +
+  labs(x="Stage", y=expression(paste('Mapped Read Pairs (x ', 10^6, ')') ) ) +
+  theme_minimal() +
+  theme( axis.text.x = element_text(colour = "black", angle = 90, vjust = 0.4, hjust = 1) )
+
+print(readPairsBoxPlot)
+
+# Plot points and bar for mean for just RNA-seq data
+# ggplot(data = rnaseqQortsData.stage.m, aes(x = stageName, y = value, colour = sampleType) ) +
+# 	geom_jitter( height = 0, width = 0.1 ) +
+# 	stat_summary(fun.y = "mean", fun.ymin = "mean",
+#                 fun.ymax="mean", geom = "crossbar", width = 0.5 ) +
+# 	scale_y_continuous( labels = function(x){ sprintf('%.0f', x/1000000) } ) +
+# 	labs(x="Stage", y="Mapped Read Pairs (x1000000)") +
+#     theme_minimal() +
+#     theme( axis.text.x = element_text( colour = "black", angle = 90, hjust = 1 ),
+#             axis.text.y = element_text( size = rel(0.8)),
+#             axis.title.y = element_text( size = rel(0.8))
+#     )
+
+
+# # add to plot list
+# plotList <- add_to_plot_list( plotList, 
+#                               readPairsBoxPlot, file.path(rootPath, 'plots', 'Fig.S1a.pdf') )
+
+# output to eps
+postscript(file = file.path(rootPath, 'plots', 'Fig.S1a.eps'),
+           width= 7, height = 5, paper = "special")
+print(readPairsBoxPlot)
+dev.off()
 
 ```
 
@@ -284,37 +325,33 @@ plotList <- add_to_plot_list( plotList,
                               readPairsBoxPlot, file.path(rootPath, 'plots', 'Figure.1b.pdf') )
 ```
 
-### Fig 1c
+### Fig. S1b
 
 #### Genes detected
 
-```{r rnaseq_genes_detected}
-countThreshold <- 5
-totalGenesDetected <- sum( apply(counts(dds, normalized=TRUE), 1, 
-                                 function(row){ sum( row >= countThreshold ) > 0 } ) )
-rnaseqGenesDetectedByStage <- apply(counts(dds, normalized=TRUE), 2, function(col){ sum(col >= countThreshold) } )
+```{r genes_detected_plot, include=TRUE, eval=FALSE}
+rnaseqTpmThreshold <- 1
+rnaseqGenesDetectedByStage <- apply(tpmFilt, 2, function(col){ sum(col >= rnaseqTpmThreshold) } )
 rnaseqGenesDetected.m <- melt(rnaseqGenesDetectedByStage)
-
 rnaseqGenesDetected <- data.frame(
   sampleName = rownames(rnaseqGenesDetected.m),
-  sampleType = rep('RNA-Seq', nrow(rnaseqGenesDetected.m)),
   genes = rnaseqGenesDetected.m$value
 )
 rnaseqGDData <- merge(rnaseqGenesDetected, rnaseqSampleInfo)
 
-```
+numGenesPlotRNAseq <- ggplot(data = rnaseqGDData, aes(x = stageName, y = genes) ) +
+  geom_boxplot(outlier.shape=NA, size = 0.2 ) +
+  labs(x="Stage", y=paste0("Genes Detected (>= ", rnaseqTpmThreshold, " TPM)") ) +
+  theme_minimal() +
+  theme( axis.text.x = element_text(colour = "black", angle = 90, vjust = 0.4, hjust = 1) )
 
-```{r detct_genes_detected}
-countThreshold <- 5
-detctGenesDetected <- apply(counts(detctDESeqDataSet, normalized=TRUE), 2, function(col){ sum(col >= countThreshold) } )
-detctGenesDetected.m <- melt(detctGenesDetected)
-detctGenesDetected <- data.frame(
-  sampleName = rownames(detctGenesDetected.m),
-  sampleType = rep('DETCT', nrow(detctGenesDetected.m) ),
-  genes = detctGenesDetected.m$value
-)
+print(numGenesPlotRNAseq)
 
-detctGDData <- merge(detctGenesDetected, detctSampleInfo )
+# output to eps
+postscript(file = file.path(rootPath, 'plots', 'Fig.S1b.eps'),
+           width= 7, height = 5, paper = "special")
+print(numGenesPlotRNAseq)
+dev.off()
 
 ```
 
