@@ -22,7 +22,7 @@ for( package in packages ){
 opts_chunk$set( fig.width=9, fig.height=6, include=FALSE, echo=FALSE  )
 ```
 
-```{r set_up_plot_list}
+```{r set_up_plot_list, eval = FALSE}
 plotList <- list()
 add_to_plot_list <- function( plotList, plot, filename ){
   index <- length(plotList) + 1
@@ -34,7 +34,11 @@ figNum <- 1
 
 ```{r get_root}
 rootPath <- find_root(is_rstudio_project)
-for( dir in c('plots', 'topgo', file.path('topgo', 'maxByStage') ) ){
+for( dir in c('plots', 'output', 
+              file.path('output', 'topgo'),
+              file.path('output', 'topgo', 'maxByStage'),
+              file.path('output', 'topgo', '0.94-e85'),
+              file.path('output', 'biolayout-clusters-files') ) ){
   dirPath <- file.path( rootPath, dir )
   if( !dir.exists(dirPath) ){
     dir.create( dirPath )
@@ -101,6 +105,23 @@ if( file.exists(DeseqDataFile) ){
   
   rnaseqSampleInfo$stageName <- factor( rnaseqSampleInfo$stageName,
                                         levels = unique(rnaseqSampleInfo$stageName) )
+  rnaseqSampleInfo$sampleName <- factor( rnaseqSampleInfo$sampleName,
+                                         levels = unique(rnaseqSampleInfo$sampleName) )
+
+  # define groups for colouring
+  stageGroupNames <- c("pre-ZGA", "Gastrula", "Somitogenesis", "Prim-stages", "2-5dpf")
+  colourGroup <-
+    c(rep(paste0(stageGroupNames[1], '-', 1:4), each = 5),
+      rep(paste0(stageGroupNames[2], '-', 1:4), each = 5),
+      rep(paste0(stageGroupNames[3], '-', 1:3), each = 5),
+      rep(paste0(stageGroupNames[4], '-', 1:3), each = 5),
+      rep(paste0(stageGroupNames[5], '-', 1:4), each = 5) )
+  rnaseqSampleInfo$colourGroup <- factor( colourGroup,
+                                          levels = unique(colourGroup) )
+  rnaseqSampleInfo$stageGroup <- 
+    factor( gsub("-[1-5]$", "", colourGroup),
+            levels = c("pre-ZGA", "Gastrula", "Somitogenesis", "Prim-stages", "2-5dpf") )
+  
   # set sample names to be row names of sample info
   rownames(rnaseqSampleInfo) <- rnaseqSampleInfo$sampleName
 
@@ -125,62 +146,86 @@ if( file.exists(DeseqDataFile) ){
   # save objects to file for reloading
   save(rnaseqData, countData, rnaseqSampleInfo, dds, ddsRlog, file=DeseqDataFile)
 }
+
+# create sample strip image
+# create colour-blind friendly palette
+colourBlindHues <- c(
+  orange = 41,
+  blue_green = 164,
+  yellow = 56,
+  blue = 202,
+  purple = 326,
+  vermillion = 27,
+  black = 0
+)
+
+# palette with changing value
+colourPalette <- 
+  hsv(h = c( rep(colourBlindHues[1]/360, 4),
+             rep(colourBlindHues[2]/360, 4),
+             rep(colourBlindHues[3]/360, 3),
+             rep(colourBlindHues[4]/360, 3),
+             rep(colourBlindHues[5]/360, 4) ), 
+      v = c(seq(1,0.55,-0.15),
+            seq(1,0.55,-0.15),
+            seq(1,0.55,-0.225),
+            seq(1,0.55,-0.225),
+            seq(1,0.55,-0.15)
+      ),
+      s = c(rep(1, 14), 0.6, rep(1,3)) 
+  )
+names(colourPalette) <- levels(rnaseqSampleInfo$stageName)
+# output colours
+write.table(
+  data.frame(
+    row.names = levels(rnaseqSampleInfo$condition),
+    stage = levels(rnaseqSampleInfo$stageName),
+    stageGroup = ddply(rnaseqSampleInfo, .(condition, stageGroup), summarise, sum = length(condition) )$stageGroup,
+    colour = colourPalette
+  ), 
+  file.path(rootPath, 'output', 'zfs-stages-palette.dark.txt'), 
+  quote = FALSE, sep = "\t", col.names = NA
+)
+# set shape palette for later as well
+shapePalette <- c(15:18,7)
+
+sampleStrip <- 
+  ggplot(data=rnaseqSampleInfo, aes(x=sampleName, y=1, fill=stageName) ) + 
+  geom_tile() + 
+  scale_fill_manual(values = colourPalette) + 
+  guides(fill=FALSE) +
+  theme_void()
+
+# this isn't quite right. it has some white space around that I can't figure out how to get rid of.
+svg(filename = file.path(rootPath, 'plots', 'sample-strip.svg'),
+    width = 3.5, height = 0.2)
+print(sampleStrip)
+dev.off()
+
 ```
 
-```{r loadDETCTData}
-detctDataFile <- file.path(rootPath, 'dataFiles', 'detct', 'DESeq.zfs.detct.grcz10.RData')
-# load from file if it exists
-if( file.exists(detctDataFile) ){
-  load(detctDataFile)
-} else {
-  dataFile <- file.path(rootPath, 'dataFiles', 'detct', 'zfs-detct-grcz10.tsv')
-  if( !file.exists(dataFile) ){
-    stop("DETCT counts data file is not present! Please download from figshare. See README.")
-  }
-  detctData <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"",
-                     comment.char = "%")
-  rownames(detctData) <- paste(detctData[,1], detctData[,2], detctData[,3], detctData[,5], sep=":")
-  countData <- detctData[ , grepl("zmp.*count", colnames(detctData) ) &
-                            !grepl("normalised", colnames(detctData) ) ]
-  colnames(countData) <- gsub(".count", "", colnames(countData) )
+```{bash create_svg_files}
+# wrote a quick script to produce the same SVG without the white space
+# create svg using colours in palette file
+cut -f4 output/zfs-stages-palette.dark.txt | grep -v colour | \
+perl -lane 'BEGIN{ @colours = ();} { push @colours, $F[0]; } 
+END{ print join(q{}, q{perl sample_strip.pl --colours "}, 
+join(q{" --colours "}, @colours ), q{"} ); }' | sh > plots/sample_strip.dark.svg
 
-  # sample Info
-  detctSampleInfoFile <- file.path(rootPath, 'dataFiles', 'detct', 'zfs-detct-sampleInfo.tsv')
-  detctSampleInfo <- read.table(detctSampleInfoFile, sep="\t", header=TRUE,
-                                colClasses = c('character', 'character', 'character', 
-                                          'factor', 'factor', 'factor', 'character' ) )
-  rownames(detctSampleInfo) <- detctSampleInfo$sample
-  # order by countData column names
-  detctSampleInfo <- detctSampleInfo[ colnames(countData), ]
-  # set levels of stageName
-  detctSampleInfo$stageName <- factor( detctSampleInfo$stageName,
-                                  levels = unique(detctSampleInfo$stageName) )
-  # relabel colnames with sample names
-  colnames(countData) <- detctSampleInfo$sampleName
-  colnames(countData) <- 
-    gsub(" ", "-", colnames(countData))
-  # row names of sample info must match count data column names
-  rownames(detctSampleInfo) <- detctSampleInfo$sampleName
-  
-  # make DESeq object and do vst transform
-  detctDESeqDataSet <- DESeqDataSetFromMatrix(countData, detctSampleInfo, design = ~ condition)
-  featureData <- detctData[ , !grepl("count", colnames(detctData)) | grepl("3..end.read.count", colnames(detctData)) ]
-  mcols(detctDESeqDataSet) <- DataFrame(mcols(detctDESeqDataSet), 
-                                        region = rownames(featureData),
-                                        featureData
-                                        )
-  detctDESeqDataSet <- estimateSizeFactors(detctDESeqDataSet)
-  detctDESeqDataSetVst <- varianceStabilizingTransformation(detctDESeqDataSet, blind=TRUE)
-  
-  # save objects to file for reloading
-  save(detctData, detctSampleInfo, detctDESeqDataSet, detctDESeqDataSetVst, file=detctDataFile)
-}
-
+# make a version with black lines around the rectangles
+cut -f4 output/zfs-stages-palette.dark.txt | grep -v colour | \
+perl -lane 'BEGIN{ @colours = ();} { push @colours, $F[0]; } 
+END{ print join(q{}, q{perl sample_strip.pl --colours "}, 
+join(q{" --colours "}, @colours ), q{" --lines} ); }' | sh > plots/sample_strip-lines.dark.svg
 ```
 
-### Fig. 1b
+## Fig. S1
 
-```{r load_qorts_rnaseq_data}
+### Fig. S1a
+
+#### Reads Mapped
+
+```{r reads_mapped_rnaseq}
 # the data on Mapped reads comes from the QoRTs package and is present in summary table file
 # the READ_PAIR_OK category are read pairs that are properly paired and uniquely mapped
 
