@@ -1472,9 +1472,52 @@ geneCountTable <- data.frame(
   "Percentage" = round( (geneCountsByCategory[,2]/(geneCountsByCategory[,1] + geneCountsByCategory[,2]))*100, digits = 1 )
 )
 
-geneCountsFile <- file.path(rootPath, paste0('e', ensVersion, '.maxStageClusters.gene_counts.tsv') )
+geneCountsFile <- file.path(rootPath, 'output', paste0('e', ensVersion, '.maxStageClusters.gene_counts.tsv') )
 write.table(geneCountTable, file = geneCountsFile, sep = "\t", quote = FALSE,
             row.names = TRUE, col.names = NA )
+
+# plot counts table as tile plot
+geneCountsByCategory.m <- melt(geneCountsByCategory)
+geneCountsByCategory.m$value <- as.character( geneCountsByCategory.m$value )
+
+geneCountsByCategory.m.List <- split( geneCountsByCategory.m, geneCountsByCategory.m$Var2 )
+  data <- geneCountsByCategory
+  rows <- nrow(data)
+
+  x <- rep( c(2, 0.5), rows )
+  j <- 2 * rows
+  width <- rep( c(2,1), rows )
+  height <- numeric( length = j )
+  y <- numeric(length = j)
+  labels <- character(length = j)
+  # go through stages backwards. from 0 on the plot
+  height_offset <- 0
+  for( stage in rev(rownames(geneCountsByCategory)) ){
+    cat(stage, "\n")
+    total_genes <- sum(geneCountsByCategory[stage, ])
+    height[c(j,j-1)] <- total_genes
+    labels[j] <- as.character(geneCountsByCategory[stage, 'Characterised Genes'])
+    pc_un <- sprintf('%.1f%%', geneCountsByCategory[stage, 'Uncharacterised Genes']/total_genes*100)
+    labels[j-1] <- paste0(geneCountsByCategory[stage, 'Uncharacterised Genes'], ' (',
+                          pc_un, ')')
+    y[c(j,j-1)] <- total_genes/2 + height_offset
+    height_offset <- height_offset + total_genes
+    j <- j - 2
+  }
+tableTilePlotData <- data.frame( x = x, y = y, 
+                                 width = width, height = height, labels = labels )
+
+tablePlot <- ggplot( data = tableTilePlotData ) + 
+  geom_tile( aes( x = x, y = y, width = width, height = height), fill="grey90", colour = "white" ) +
+  geom_text( aes( x = x, y = y, label = labels ), size = 2.1 ) + 
+  theme_void()
+
+postscript( file = file.path(rootPath, 'plots', 'plotTable.eps'), 
+            width = 1.1, height = 5.5, paper="special",
+            horizontal = FALSE)
+print(tablePlot)
+dev.off()
+
 ```
 
 #### ZFA enrichment
