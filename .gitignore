@@ -16,3 +16,4 @@ regionalExpression.PFAM.tsv
 pdb_pfam_mapping.txt
 dataFiles/paralogues-Biomart.txt
 zfs-plots_files/*
+output/*
