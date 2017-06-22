@@ -548,22 +548,119 @@ print(genesDistPlot)
 dev.off()
 ```
 
-### Fig 1d
+### Fig 1b
 
 #### Sample Correlation Matrix
 
-```{r fig1d, include=TRUE}
-# create sample correlation matrix
-sampleCor <- cor(counts(dds, normalized=TRUE))
+```{r fig1b, include=TRUE}
+# 
+# sampleCor <- cor(tpmFilt)
+# 
+# # melt for ggplot
+# sampleCor.m <- melt(sampleCor)
+# # reverse levels of y axis variable so that it plots sensibly
+# sampleCor.m$Var2 <- factor( sampleCor.m$Var2,
+#                             levels = rev(levels(sampleCor.m$Var2))
+#   )
+# # plot correlation matrix
+# sampleCorHeatmap <- ggplot(data = sampleCor.m) + 
+#   geom_tile( aes( x = Var1, y = Var2, fill = value ),
+#                colour = "grey60" ) + 
+#   scale_fill_gradientn( colours = c("blue", "yellow", "red"),
+#                         guide = guide_colorbar(title = "Correlation\nCoefficient\n(Pearson)") ) + 
+#   theme_void() + theme( legend.position="right",
+#                         legend.title = element_text(colour="black" ) )
+# 
+# 
+# plotList <- add_to_plot_list( plotList, 
+#                               sampleCorHeatmap, file.path(rootPath, 'plots', 'Figure.1d.pdf') )
+# 
+# print(sampleCorHeatmap)
+
+# create Spearmansample correlation matrix
+sampleCor_spearman <- cor(tpmFilt, method = "spearman")
+sampleCor_spearman.m <- melt(sampleCor_spearman)
+sampleCor_spearman.m$Var2 <- factor( sampleCor_spearman.m$Var2, levels = rev(levels(sampleCor_spearman.m$Var2)) )
+
+sampleCor_spearman_heatmap <- ggplot(data = sampleCor_spearman.m) +
+  geom_tile( aes( x = Var1, y = Var2, fill = value), colour = "grey60" ) +
+  scale_fill_gradientn( colours = c("blue", "yellow", "red"),
+                        guide = guide_colorbar(title = "Correlation\nCoefficient\n(Spearman)") ) +
+  theme_void() + theme( legend.position="right", legend.title = element_text(colour="black" ) )
+
+# plot as eps
+# plot one with the legend and one without to get a square plot of the matrix
+postscript(file.path(rootPath, 'plots', 'Fig.1b.eps'),
+           width = 6, height = 5)
+print(sampleCor_spearman_heatmap)
+dev.off()
+
+postscript(file.path(rootPath, 'plots', 'Fig.1b.no_legend.eps'),
+           width = 5, height = 5)
+print(sampleCor_spearman_heatmap + theme(legend.position = 'none'))
+dev.off()
+
+# other colour schemes
+# pdf(file=file.path(rootPath, 'plots', 'sample_cor_spearman.pdf'))
+# 
+# ggplot(data = sampleCor_spearman.m) + 
+#   geom_tile( aes( x = Var1, y = Var2, fill = value), colour = "grey60" ) +  
+#   scale_fill_viridis(guide = guide_colorbar(title = "Correlation\nCoefficient\n(Spearman)") ) + 
+#   theme_void() + theme( legend.position="right", legend.title = element_text(colour="black" ) )
+# 
+# ggplot(data = sampleCor_spearman.m) + 
+#   geom_tile( aes( x = Var1, y = Var2, fill = value), colour = "grey60" ) +  
+#   scale_fill_viridis(option="magma", guide = guide_colorbar(title = "Correlation\nCoefficient\n(Spearman)") ) + 
+#   theme_void() + theme( legend.position="right", legend.title = element_text(colour="black" ) )
+# dev.off()
+
+
+```
+
+```{r long_pec_vs_early_stages, eval=FALSE}
+# plot tpms against each other for every sample against long-pec-5
+pdf(file= file.path(rootPath, 'plots', 'tpm_scatterplots.pdf') )
+sample_names <- as.character(rnaseqSampleInfo$sampleName)
+for(i in seq_len(length(sample_names))){
+  for(j in seq_len(length(sample_names))){
+    if(j <= i){
+      next
+    } else {
+      sample_1 <- sample_names[i]
+      sample_2 <- sample_names[j]
+      plot_data <- data.frame(
+        gene_id = row.names(tpmFilt),
+        tpm_y = tpmFilt[, sample_1],
+        tpm_x = tpmFilt[, sample_2]
+      )
+      print( 
+        ggplot(data = plot_data, aes(x = tpm_x, y = tpm_y)) + geom_point() +
+          labs(x = sample_2, y = sample_1) + 
+          lims(x = c(0,260000), y = c(0,260000))
+        )
+    }
+  }
+}
+dev.off()
+
+# Pearson is skewed by one highly expressed gene
+which( tpmFilt[, '1-cell-1'] > 200000 )
+ENSDARG00000080337 
+             15809
+
+# redo pearson without that gene
+tpmFiltnoMT <- tpmFilt[ !(rownames(tpmFilt) == 'ENSDARG00000080337'), ]
+
+pearson_noMT <- cor(tpmFiltnoMT)
 
 # melt for ggplot
-sampleCor.m <- melt(sampleCor)
+pearson_noMT.m <- melt(pearson_noMT)
 # reverse levels of y axis variable so that it plots sensibly
-sampleCor.m$Var2 <- factor( sampleCor.m$Var2,
-                            levels = rev(levels(sampleCor.m$Var2))
+pearson_noMT.m$Var2 <- factor( pearson_noMT.m$Var2,
+                            levels = rev(levels(pearson_noMT.m$Var2))
   )
 # plot correlation matrix
-sampleCorHeatmap <- ggplot(data = sampleCor.m) + 
+pearson_noMTHeatmap <- ggplot(data = pearson_noMT.m) + 
   geom_tile( aes( x = Var1, y = Var2, fill = value ),
                colour = "grey60" ) + 
   scale_fill_gradientn( colours = c("blue", "yellow", "red"),
@@ -571,14 +668,14 @@ sampleCorHeatmap <- ggplot(data = sampleCor.m) +
   theme_void() + theme( legend.position="right",
                         legend.title = element_text(colour="black" ) )
 
+# looks more like the Spearman matrix
+pdf(file.path(rootPath, 'plots', 'samplecor.pearson.noENSDARG00000080337.pdf'))
+print(pearson_noMTHeatmap)
+dev.off()
 
-plotList <- add_to_plot_list( plotList, 
-                              sampleCorHeatmap, file.path(rootPath, 'plots', 'Figure.1d.pdf') )
-
-print(sampleCorHeatmap)
 ```
 
-### Fig 1e-h
+### Fig 1c-d
 
 ```{r pca}
 varPCThreshold <- 1
