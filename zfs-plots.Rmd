@@ -288,41 +288,138 @@ dev.off()
 
 ```
 
-```{r DETCT_data}
-# DETCT data
-# This data comes from running samtools flagstat on each bam file and then selecting the entry for properly paired reads
-# e.g. grep properly $sample.markdup.flagstat.txt | awk '{ print "'$sample'", $1 }'
-detctReadDataFile <- file.path(rootPath, 'dataFiles', 'detct', 'zfs-detct.read-pairs-mapped.tsv' )
-detctReadData <- read.table(file=detctReadDataFile, sep="\t", header=FALSE)
-colnames(detctReadData) <- c('sample', 'value')
-detctReadData$sampleType <- factor( rep('DETCT', nrow(detctReadData) ),
-                                   levels = c('RNA-Seq', 'DETCT') )
-detctReadDataMerged <- merge(detctReadData, detctSampleInfo)
+```{r getTranscriptInfo}
+# check for the existence of Transcript info
+# Ensembl version is set at the top of the script
+TranscriptsFile <- file.path(rootPath, 'dataFiles', 'rnaseq', paste0('Danio_rerio.e', ensVersion, '.transcript.lengths.tsv') )
+gtfFile <- file.path(rootPath, paste0('Danio_rerio.GRCz10.', ensVersion, '.gtf') )
+
+if( file.exists(TranscriptsFile) ){
+  TxInfo <- read.table(file=TranscriptsFile, sep="\t", row.names = 1)
+  TxLengths <- TxInfo[[1]]
+  names(TxLengths) <- rownames(TxInfo)
+} else{
+  # check for the existence of TxDb file
+  TxDbFile <- file.path(rootPath, 'dataFiles', paste0('Danio_rerio.GRCz10.', ensVersion, '.db') )
+  if( file.exists( TxDbFile ) ){
+    txdb <- loadDb( TxDbFile )
+  } else {
+    # make TxDb from GFF file
+    txdb <- makeTxDbFromGFF(
+      gtfFile, format="gtf",
+      dataSource = "Ensembl",
+      organism = "Danio rerio",
+      taxonomyId = 7955
+    )
+    # save to db file
+    saveDb( txdb, TxDbFile )
+  }
+  # calculate lengths of transcripts
+  exonsByGene <- exonsBy(txdb, by="gene")
+  TxLengths <- sapply(exonsByGene, 
+                      function( gene ){ sum( width( reduce(unlist(gene)) ) ) }
+  )
+  write.table(TxLengths, file=TranscriptsFile, 
+              row.names=TRUE, sep="\t", quote=FALSE, col.names = FALSE)
+}
 ```
 
-```{r fig1b, include=TRUE}
-# concate RNASeq and DETCT data
-RPPlotData <- rbind( rnaseqQortsData.stage.m, detctReadDataMerged )
+```{r getInsertSizes}
+# get InsertSize_Mean from QoRTs output
+qortsSummaryFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'qorts-summary-table.txt')
+qortsSummary <- read.table(qortsSummaryFile, sep="\t", 
+                           header=TRUE, row.names = 1 )
+insertSizes <- unlist(qortsSummary["InsertSize_Mean",])
 
-# plot read pairs by sample
-readPairsBoxPlot <- ggplot(data=RPPlotData, 
-                        aes(x=stageName, y=value, fill=sampleType) ) +
-  geom_boxplot(outlier.shape=NA) +
-  scale_y_continuous( labels = function(x){ sprintf('%.0f', x/1000000) },
-                      limits = c(0,17500000) ) +
-  scale_fill_manual( name = "Sample Type", values = c("steelblue3", "firebrick2") ) + 
-  labs(x="Stage", y="Mapped Read Pairs (x1000000)") + 
-  theme_minimal() + 
-  theme( axis.text.x = element_text( colour = "black", angle = 90, hjust = 1 ),
-         axis.text.y = element_text( size = rel(0.8)),
-         axis.title.y = element_text( size = rel(0.8))
-         )
+# match up sample names
+names(insertSizes) <- sapply(names(insertSizes), 
+ function(sample){ rownames(rnaseqSampleInfo)[ rnaseqSampleInfo$sample == sample ] } 
+)
+insertSizes <- insertSizes[ rownames(colData(dds)) ]
+```
 
-print(readPairsBoxPlot)
+```{r countsToTpm}
+#' This function is from https://gist.github.com/slowkow/c6ab0348747f86e2748b#file-counts_to_tpm-r
+#' Convert counts to transcripts per million (TPM).
+#' 
+#' Convert a numeric matrix of features (rows) and conditions (columns) with
+#' raw feature counts to transcripts per million.
+#' 
+#'    Lior Pachter. Models for transcript quantification from RNA-Seq.
+#'    arXiv:1104.3889v2 
+#'    
+#'    Wagner, et al. Measurement of mRNA abundance using RNA-seq data:
+#'    RPKM measure is inconsistent among samples. Theory Biosci. 24 July 2012.
+#'    doi:10.1007/s12064-012-0162-3
+#'    
+#' @param counts A numeric matrix of raw feature counts i.e.
+#'  fragments assigned to each gene.
+#' @param featureLength A numeric vector with feature lengths.
+#' @param meanFragmentLength A numeric vector with mean fragment lengths.
+#' @return tpm A numeric matrix normalized by library size and feature length
+counts_to_tpm <- function(counts, featureLength, meanFragmentLength) {
+  
+  # Ensure valid arguments.
+  stopifnot(length(featureLength) == nrow(counts))
+  stopifnot(length(meanFragmentLength) == ncol(counts))
+  
+  # Compute effective lengths of features in each library.
+  effLen <- do.call(cbind, lapply(1:ncol(counts), function(i) {
+    featureLength - meanFragmentLength[i] + 1
+  }))
+  
+  # Exclude genes with length less than the mean fragment length.
+  idx <- apply(effLen, 1, function(x) min(x) > 1)
+  counts <- counts[idx,]
+  effLen <- effLen[idx,]
+  featureLength <- featureLength[idx]
+  
+  # Process one column at a time.
+  tpm <- do.call(cbind, lapply(1:ncol(counts), function(i) {
+    rate = log(counts[,i]) - log(effLen[,i])
+    denom = log(sum(exp(rate)))
+    exp(rate - denom + log(1e6))
+  }))
 
-# add to plot list
-plotList <- add_to_plot_list( plotList, 
-                              readPairsBoxPlot, file.path(rootPath, 'plots', 'Figure.1b.pdf') )
+  # Copy the column names from the original matrix.
+  colnames(tpm) <- colnames(counts)
+  return(tpm)
+}
+```
+
+```{r create_and_filter_tpm}
+tpm <- counts_to_tpm(counts(dds), TxLengths, insertSizes)
+
+# divide data up by Gene and then Stage
+tpmByGeneList <- split.data.frame(tpm, 
+                                  factor(rownames(tpm), 
+                                          levels = rownames(tpm))
+                                  )
+tpmByGeneByStageList <- lapply(tpmByGeneList,
+                               function(x){ 
+                                 split.data.frame(t(x), rnaseqSampleInfo$stageName) } )
+
+# filter to genes with non-zero TPM in all replicates at at least one stage
+tpmThreshold <- 0
+genesAboveThreshold <- sapply( tpmByGeneByStageList,
+                               function(geneByStageList){
+                                 any( sapply(geneByStageList, 
+                                             function(x){ all(x > tpmThreshold) } ) )
+                               }
+                        )
+tpmFilt <- tpm[genesAboveThreshold, ]
+
+# join to annotation and output for expression file
+tpmAnno <- merge( mcols(dds), tpmFilt, 
+                  by.x = c('e85.Ensembl.Gene.ID'),
+                  by.y = 0 )
+tpmAnno <- data.frame(
+  ID = tpmAnno[['Gene.name']],
+  tpmAnno
+)
+outFilename <- file.path(rootPath, 'output', 'zfs-grcz10.tpm.tsv')
+write.table(tpmAnno, file = outFilename, quote = FALSE, sep = "\t",
+            col.names = FALSE, row.names = FALSE)
 ```
 
 ### Fig. S1b
@@ -355,30 +452,100 @@ dev.off()
 
 ```
 
-```{r fig1c, include=TRUE}
-# create plot
-numGenesData <- rbind( rnaseqGDData[ , c("sampleName", "sampleType", "stageName", "genes") ],
-                         detctGDData[ , c("sampleName", "sampleType", "stageName", "genes") ] )
-  
-numGenesPlot <- ggplot(data=numGenesData, 
-                       aes(x=stageName, y=genes, fill=sampleType) ) +
-  geom_boxplot( outlier.shape=NA ) +
-  scale_fill_manual( name = "Sample Type", values = c("steelblue3", "firebrick2") ) + 
-  guides( colour = guide_legend(title = "Stage") ) + 
-  labs(x="Stage", y=paste0("Genes Detected (>= ", countThreshold, " counts)") ) +
-  theme_minimal() + 
-  theme( axis.text.x = element_text(angle = 90, vjust = 0.4, hjust = 1, size = rel(0.8)),
-         axis.text.y = element_text( size = rel(0.8)),
-         axis.title.x = element_text( size = rel(0.8)),
-         axis.title.y = element_text( size = rel(0.8))
+### Fig. S1c
+
+#### Distribution of mean TPM by stage
+
+```{r mean_tpm_dist_by_stage, include = TRUE}
+# divide data up by Gene and then Stage
+tpmFiltByGeneList <- 
+  split.data.frame(tpmFilt, 
+                    factor(rownames(tpmFilt), 
+                    levels = rownames(tpmFilt))
+  )
+tpmFiltByGeneByStageList <- lapply(tpmFiltByGeneList,
+                               function(x){ 
+                                 split.data.frame(t(x), rnaseqSampleInfo$stageName) } )
+
+tpmFiltByStageList <- 
+  split.data.frame(t(tpmFilt), rnaseqSampleInfo$stageName)
+
+# filter ones where all samples are 0 for that stage
+meanTpmFiltByStage <- 
+  do.call('rbind',
+    lapply(seq_len(length(tpmFiltByStageList)),
+         function(i){
+           tpmFiltByStage <- tpmFiltByStageList[[i]]
+           aboveThreshold <- apply(tpmFiltByStage, 2, function(col){ !all(col == 0) } )
+           means <- colMeans(tpmFiltByStage)[aboveThreshold]
+           return(
+             data.frame(
+               stage = rep(names(tpmFiltByStageList)[i], length(means)),
+               gene_id = names(means),
+               meanExpr = means
+             )
+           )
+         }
+    )
   )
 
-print(numGenesPlot)
+# work out tallest bar on a histogram
+# calc lowest and highest log2 category
+xLowLim <- floor(log2(min(meanTpmFiltByStage$meanExpr)))
+xHighLim <- ceiling(log2(max(meanTpmFiltByStage$meanExpr)))
+# cut mean expression column and count up numbers in bins
+meanTpmFiltByStage$binned_data <- cut(log2(meanTpmFiltByStage$meanExpr), breaks = seq(xLowLim,xHighLim,1))
+bin_counts <- ddply(
+    meanTpmFiltByStage, .(stage, binned_data),
+    summarize, bin_size = length(binned_data)
+)
+# work out total genes detected per stage
+numGenes <- ddply(
+    meanTpmFiltByStage, .(stage),
+    summarize, numGenes = paste0( 'Total genes = ', length(stage) )
+  )
+midRange <- floor(2^(xHighLim - (xHighLim - xLowLim)/2)) # place the text in the middle of the x axis
+maxBarHeight <- (ceiling(max(bin_counts$bin_size)/1000) + 0.2)*1000 # put the text just above the nearest 1000 above the tallest bar
+numGenes$x = rep(midRange, nrow(numGenes) )
+numGenes$y = rep(maxBarHeight, nrow(numGenes) )
 
-# add to plot list
-plotList <- add_to_plot_list( plotList, 
-                              numGenesPlot, 
-                              file.path(rootPath, 'plots', 'Figure.1c.pdf') )
+genesDistPlot <- ggplot(data=meanTpmFiltByStage, aes(meanExpr) ) +
+  geom_histogram( breaks = seq(xLowLim,xHighLim,1), closed = 'right' ) +
+  geom_text( data = numGenes, aes(x, y, label=numGenes), size = 2 ) +
+  facet_wrap( ~ stage, nrow = 3, scales = "free_x" ) +
+  labs(x="Mean Expression (log2[TPM])", y="Frequency",
+       title="Distribution of gene expression by stage") +
+  theme_minimal() + 
+  theme( strip.background = element_rect(fill="grey90", colour = "white"),
+         panel.spacing.y = unit(0.5, units = 'cm'),
+         axis.text.x = element_text( size = 6, angle = 0, debug = FALSE)
+         ) + 
+  scale_x_continuous(trans = log2_trans(),
+                     labels = 
+                       function(log2breaks){
+    log2labels <- vector('list', length = length(log2breaks))
+    # log2breaks <- c(NA,-4, 3, 10, 17)
+    for( i in seq_len(length(log2breaks)) ){
+      exponent <- as.character(log2(log2breaks[i]))
+      if(is.na(exponent)){
+        log2labels[[i]] <- NA
+      } else {
+        log2labels[[i]] <- bquote(2^ ~ .(exponent))
+      }
+    }
+    # print(log2labels)
+    return(log2labels)
+  } )
+
+print(genesDistPlot)
+```
+
+```{r tpm_dist_hist}
+# output to eps
+postscript(file = file.path(rootPath, 'plots', 'Fig.S1c.eps'),
+           width= 7, height = 5, paper = "special")
+print(genesDistPlot)
+dev.off()
 ```
 
 ### Fig 1d
