@@ -1136,7 +1136,31 @@ grid.draw(
                nrow = 6, ncol = 6
               )
 )
-dev.off()
+```
+
+#### ChIP-Seq
+
+```{r h3k4_chip_seq}
+stages <- c('Dome', 'Prim-5')
+for (stage in stages){
+  # get genes expressed and not expressed
+  for (tpm_threshold in c(0,1) ){
+    detected <- sapply(tpmByGeneByStageList, function(x){ all(x[[stage]] > tpm_threshold) })
+    not_detected <- sapply(tpmByGeneByStageList, function(x){ all(x[[stage]] == 0) } )
+    genes_detected <- data.frame(
+      gene_id = names(tpmByGeneByStageList),
+      detection_status = factor( rep(NA, length(detected)),
+              levels = c('DETECTED', 'NOT DETECTED') )
+    )
+    genes_detected$detection_status[detected] <- 'DETECTED'
+    genes_detected$detection_status[not_detected] <- 'NOT DETECTED'
+    
+    write.table(genes_detected, 
+                file.path(rootPath, 'output', paste0('genes_detected.', tpm_threshold, '-tpm.', stage, '.txt') ),
+                quote = FALSE, row.names = FALSE, col.names = FALSE, sep = "\t")
+  }
+}
+
 ```
 
 ### Figure 1-3
