@@ -697,23 +697,35 @@ sampleNames <- FALSE
 #' @param sampleNames a character vector of optional sample names to be plotted next to the points
 #'
 #' @return plot A ggplot2object of the scatterplot
-
-PCA_plot <- function( pca, propVarPC, firstPC, secondPC = NULL, DESeqTrans, sampleNames = NULL ){
+#'
+PCA_plot <- function( pca, propVarPC, firstPC, secondPC = NULL, 
+                      DESeqTrans, sampleNames = NULL, 
+                      colourPalette = NULL, shapePalette = NULL, size = 2 ){
   secondPC <- ifelse(is.null(secondPC), firstPC + 1, secondPC )
   # make a data frame for plotting from
-  d <- data.frame(first=pca$x[,firstPC], second=pca$x[,secondPC],
-                  Stage=colData(DESeqTrans)$stageName )
+  d <- data.frame(first = pca$x[,firstPC], second = pca$x[,secondPC],
+                  Stage = colData(DESeqTrans)$stageName,
+                  StageGroup = colData(DESeqTrans)$stageGroup)
   if( !is.null( sampleNames ) ){
     d$name <- sampleNames
   }
-  # choose plot colours
-  numLevels <- nlevels(d$Stage)
-  ord1 <- seq(1,numLevels,2)
-  ord2 <- seq(2,numLevels,2)
-  colourPalette <- hue_pal()(numLevels)[ order(c(ord1,ord2)) ]
-  pcaPlot <- ggplot(data=d) +
-    geom_point( aes(x=first, y=second, colour=Stage) ) + 
-    scale_colour_manual( values = colourPalette ) + 
+  # # choose plot colours
+  if ( is.null(colourPalette) ) {
+    numLevels <- nlevels(d$Stage)
+    ord1 <- seq(1,numLevels,2)
+    ord2 <- seq(2,numLevels,2)
+    colourPalette <- hue_pal()(numLevels)[ order(c(ord1,ord2)) ]
+  }
+  if ( is.null(shapePalette) ) {
+    shapes = c(15:17,23,9,4,3,7)
+    numLevels <- nlevels(d$StageGroup)
+    shapePalette <- shapes[seq_len(numLevels)]
+  }
+  pcaPlot <- ggplot(data = d) +
+    geom_point( aes(x = first, y = second, colour = Stage, fill = Stage, shape = StageGroup), size = size, stroke = 0.2 ) + 
+    scale_colour_manual(values = colourPalette) + 
+    scale_fill_manual(values = colourPalette) + 
+    scale_shape_manual(values = shapePalette) +
     xlab(paste0("PC", firstPC, ": ", round(propVarPC[firstPC] * 100, 1),
                 "% variance")) +
     ylab(paste0("PC", secondPC, ": ", round(propVarPC[secondPC] * 100, 1),
@@ -764,6 +776,7 @@ runPCA <- function( DESeqObj, DESeqTransObj, regionCount ){
   genesForPCsList <- vector('list', length = sum(propVarPC * 100 >= varPCThreshold))
   for (i in seq.int(sum(propVarPC * 100 >= varPCThreshold))) {
       data[select, "% variance explained"] <- propVarRegion[,i] * 100
+      # order genes by amount of variance explained
       topData <- data[order(data$`% variance explained`, decreasing=TRUE),]
       topData <- topData[ topData[["% variance explained"]] >= varRegionThreshold, ]
       genesForPCsList[[i]] <- topData[ , !grepl('variance explained', colnames(data) ) ]
@@ -775,7 +788,8 @@ runPCA <- function( DESeqObj, DESeqTransObj, regionCount ){
       first <- i
       second <- i + 1
       pcaPlot <- PCA_plot( pca, propVarPC, first, second, 
-                           DESeqTransObj, sampleNames = NULL )
+                           DESeqTransObj, sampleNames = NULL,
+                           colourPalette = colourPalette, shapePalette = shapePalette )
       plotList[[i]] <- pcaPlot
   }
   
@@ -800,52 +814,68 @@ pcaPlotList <- pcaObj$plots
 
 #### PCA Plots (using all genes)
 
-```{r pcs1_3_plots, include=TRUE}
-# fig.1e PC1 against 2
-plotList <- add_to_plot_list( plotList, 
-                              pcaPlotList[[1]] + theme( legend.position = "none" ), 
-                              file.path(rootPath, 'plots', 'Figure.1e.pdf') )
-print( pcaPlotList[[1]] + theme( legend.position = "none" ) )
+```{r pcs1_3_plots, include=TRUE, eval=FALSE}
+# # fig.1e PC1 against 2
+# plotList <- add_to_plot_list( plotList, 
+#                               pcaPlotList[[1]] + theme( legend.position = "none" ), 
+#                               file.path(rootPath, 'plots', 'Figure.1e.pdf') )
+# print( pcaPlotList[[1]] + theme( legend.position = "none" ) )
+# 
+# # PC1 against 2, postscript
+# PlotFile <- file.path(rootPath, 'plots', 'pca.PCs1-2.ps' )
+# postscript(file=PlotFile, paper="special", width = 8, height = 8)
+# print( pcaPlotList[[1]] + theme( legend.position = "none" ) )
+# dev.off()
+# 
+# 
+# # fig.1f PC1 against 3, with legend
+# propVarPC <- pcaObj$pca$sdev^2 / sum( pcaObj$pca$sdev^2 )
+# pc1_pc3Plot <- PCA_plot( pcaObj$pca, propVarPC, 1, secondPC = 3, ddsRlog, sampleNames = NULL,
+#                          colourPalette = colourPalette, shapePalette = shapePalette)
+# plotList <- add_to_plot_list( plotList, 
+#                               pc1_pc3Plot, 
+#                               file.path(rootPath, 'plots', 'Figure.1f.pdf') )
+# print( pc1_pc3Plot )
+# 
+# # PC1 against 3
+# PlotFile <- file.path(rootPath, 'plots', 'pca.PCs1-3.ps')
+# postscript(file=PlotFile, paper="special", width = 8, height = 8)
+# print( pc1_pc3Plot + theme( legend.position = "none" ) )
+# dev.off()
+# 
+# # PC1 against 3, with legend
+# PlotFile <- file.path(rootPath, 'plots', 'pca.PCs1-3.legend.ps')
+# postscript(file=PlotFile, paper="special", width = 10, height = 8)
+# print( pc1_pc3Plot )
+# dev.off()
 
-# fig.1f PC1 against 3, with legend
-propVarPC <- pcaObj$pca$sdev^2 / sum( pcaObj$pca$sdev^2 )
-pc1_pc3Plot <- PCA_plot( pcaObj$pca, propVarPC, 1, secondPC = 3, ddsRlog, sampleNames = NULL )
-plotList <- add_to_plot_list( plotList, 
-                              pc1_pc3Plot, 
-                              file.path(rootPath, 'plots', 'Figure.1f.pdf') )
-print( pc1_pc3Plot )
 ```
 
 #### 3d plot
 
 ```{r pcaPlot3D, include=TRUE}
-# PCA
-# regionCount <- nrow(assay(ddsRlog))
-# rv <- rowVars(assay(ddsRlog))
-# select <- order(rv, decreasing=TRUE)[seq_len(min(regionCount, length(rv)))]
 pca <- pcaObj$pca
-# propVarPC <- pca$sdev^2 / sum( pca$sdev^2 )
-# aload <- abs(pca$rotation)
-# propVarRegion <- sweep(aload, 2, colSums(aload), "/")
 
 # plot first 3 components
 # choose plot colours
-numLevels <- nlevels(colData(ddsRlog)$stageName)
-ord1 <- seq(1,numLevels,2)
-ord2 <- seq(2,numLevels,2)
-colourPalette <- hue_pal()(numLevels)[ order(c(ord1,ord2)) ]
 plotColours <- rep( colourPalette, each = 5 )
 
-op <- par3d()
-par3d( cex = 0.5 )
 plot3d(pca$x[,"PC1"], pca$x[,"PC2"], pca$x[,"PC3"],  col=plotColours,
        type="s", size = 1, 
        xlab="PC1", ylab="PC2", zlab="PC3" )
-rgl.viewpoint( theta = 30, phi = 5 )
+op <- par3d()
+par3d( windowRect = c(0,0,620,512) )
+rgl.viewpoint( theta = 30, phi = 5, zoom = 0.75 )
 
-rgl.postscript( filename =file.path(rootPath, 'plots', 'Figure.1g.pdf'), 
-                fmt = 'pdf', drawText = TRUE 
+rgl.postscript( filename = file.path(rootPath, 'plots', 'Figure.1e.eps'), 
+                fmt = 'eps', drawText = TRUE 
 )
+rgl.postscript( filename = file.path(rootPath, 'plots', 'Figure.1e.notext.eps'), 
+                fmt = 'eps', drawText = FALSE 
+)
+rgl.snapshot( filename = file.path(rootPath, 'plots', 'Figure.1e.png'), 
+              fmt = "png")
+par3d(op)
 ```
 
 ### PC Median Heatmaps
@@ -856,7 +886,7 @@ medianPlotList <- vector('list', length = 6)
 for( PCNum in 1:6 ){
   dataForPC <- pcaObj$PCData[[PCNum]]
   counts <- dataForPC[ seq_len(numGenes), ]
-#   weights <- dataForPC[ seq_len(numGenes), grepl("variance.explained", colnames(dataForPC) ) ]
+
   Medians <- apply( counts, 2, median )
   # scale by log10
   log10Median <- log10( Medians + 1 )
@@ -879,8 +909,8 @@ medianHeatmap <- ggplot(data = medianPlotData) +
   scale_fill_gradientn( colours = c("blue", "yellow", "red"), 
                         guide = guide_colorbar(title = "log10\nmedian\ncounts") ) +
   theme_void() + theme( legend.position="right",
-                        legend.title = element_text(colour="black" ),
-                        axis.text.y =  element_text(colour="black" ) )
+                        legend.title = element_text(colour = "black", angle = 0, debug = FALSE),
+                        axis.text.y =  element_text(colour="black", angle = 0, debug = FALSE ) )
 
 # print median plot including legend to have a copy of the legend
 plotList <- add_to_plot_list( plotList, 
@@ -888,167 +918,6 @@ plotList <- add_to_plot_list( plotList,
                               file.path(rootPath, 'plots', 'Figure.1h.pdf') )
 
 print( medianHeatmap )
-```
-
-```{r getTranscriptInfo}
-# check for the existence of Transcript info
-# Ensembl version is set at the top of the script
-TranscriptsFile <- file.path(rootPath, 'dataFiles', 'rnaseq', paste0('Danio_rerio.e', ensVersion, '.transcript.lengths.tsv') )
-gtfFile <- file.path(rootPath, paste0('Danio_rerio.GRCz10.', ensVersion, '.gtf') )
-
-if( file.exists(TranscriptsFile) ){
-  TxInfo <- read.table(file=TranscriptsFile, sep="\t", row.names = 1)
-  TxLengths <- TxInfo[[1]]
-  names(TxLengths) <- rownames(TxInfo)
-} else{
-  # check for the existence of TxDb file
-  TxDbFile <- file.path(rootPath, 'dataFiles', paste0('Danio_rerio.GRCz10.', ensVersion, '.db') )
-  if( file.exists( TxDbFile ) ){
-    txdb <- loadDb( TxDbFile )
-  } else {
-    # make TxDb from GFF file
-    txdb <- makeTxDbFromGFF(
-      gtfFile, format="gtf",
-      dataSource = "Ensembl",
-      organism = "Danio rerio",
-      taxonomyId = 7955
-    )
-    # save to db file
-    saveDb( txdb, TxDbFile )
-  }
-  # calculate lengths of transcripts
-  exonsByGene <- exonsBy(txdb, by="gene")
-  TxLengths <- sapply(exonsByGene, 
-                      function( gene ){ sum( width( reduce(unlist(gene)) ) ) }
-  )
-  write.table(TxLengths, file=TranscriptsFile, 
-              row.names=TRUE, sep="\t", quote=FALSE, col.names = FALSE)
-}
-```
-
-```{r getInsertSizes}
-# get InsertSize_Mean from QoRTs output
-qortsSummaryFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'qorts-summary-table.txt')
-qortsSummary <- read.table(qortsSummaryFile, sep="\t", 
-                           header=TRUE, row.names = 1 )
-insertSizes <- unlist(qortsSummary["InsertSize_Mean",])
-
-# match up sample names
-names(insertSizes) <- sapply(names(insertSizes), 
- function(sample){ rownames(rnaseqSampleInfo)[ rnaseqSampleInfo$sample == sample ] } 
-)
-insertSizes <- insertSizes[ rownames(colData(dds)) ]
-```
-
-```{r countsToTpm}
-#' This function is from https://gist.github.com/slowkow/c6ab0348747f86e2748b#file-counts_to_tpm-r
-#' Convert counts to transcripts per million (TPM).
-#' 
-#' Convert a numeric matrix of features (rows) and conditions (columns) with
-#' raw feature counts to transcripts per million.
-#' 
-#'    Lior Pachter. Models for transcript quantification from RNA-Seq.
-#'    arXiv:1104.3889v2 
-#'    
-#'    Wagner, et al. Measurement of mRNA abundance using RNA-seq data:
-#'    RPKM measure is inconsistent among samples. Theory Biosci. 24 July 2012.
-#'    doi:10.1007/s12064-012-0162-3
-#'    
-#' @param counts A numeric matrix of raw feature counts i.e.
-#'  fragments assigned to each gene.
-#' @param featureLength A numeric vector with feature lengths.
-#' @param meanFragmentLength A numeric vector with mean fragment lengths.
-#' @return tpm A numeric matrix normalized by library size and feature length
-counts_to_tpm <- function(counts, featureLength, meanFragmentLength) {
-  
-  # Ensure valid arguments.
-  stopifnot(length(featureLength) == nrow(counts))
-  stopifnot(length(meanFragmentLength) == ncol(counts))
-  
-  # Compute effective lengths of features in each library.
-  effLen <- do.call(cbind, lapply(1:ncol(counts), function(i) {
-    featureLength - meanFragmentLength[i] + 1
-  }))
-  
-  # Exclude genes with length less than the mean fragment length.
-  idx <- apply(effLen, 1, function(x) min(x) > 1)
-  counts <- counts[idx,]
-  effLen <- effLen[idx,]
-  featureLength <- featureLength[idx]
-  
-  # Process one column at a time.
-  tpm <- do.call(cbind, lapply(1:ncol(counts), function(i) {
-    rate = log(counts[,i]) - log(effLen[,i])
-    denom = log(sum(exp(rate)))
-    exp(rate - denom + log(1e6))
-  }))
-
-  # Copy the column names from the original matrix.
-  colnames(tpm) <- colnames(counts)
-  return(tpm)
-}
-```
-
-```{r createTpm}
-tpm <- counts_to_tpm(counts(dds), TxLengths, insertSizes)
-```
-
-### Figure 1-1
-
-#### Distribution of mean TPM by stage
-
-```{r tpm_dist}
-#' meanByStage
-#' Calculates the mean expression for each gene for a given stage
-#' 
-#' This function takes a stage name and the count data and 
-#'    calculates the mean expression for each gene at that stage
-#'    
-#' @param stageName character, the name of the stage to calculate for
-#' @param countData matrix the count data to calculate on
-#'
-#' @return data.frame with columns stage and meanExpr
-meanByStage <- function( stageName, countData ){
-  stageCounts <- countData[ , grepl(stageName, colnames(countData)) ]
-  data.frame(
-    stage = rep(stageName, nrow(stageCounts)),
-    meanExpr = rowMeans(stageCounts)
-  )
-}
-# calculate mean TPM for each gene for each stage
-meanTpmList <- lapply(as.list(levels(colData(dds)$stageName)),
-    meanByStage, tpm
-  )
-meanTpm.m <- do.call(rbind, meanTpmList)
-```
-
-```{r meanExprHist, include=TRUE}
-# Filter to genes with mean expression > 0
-meanTpmFilt <- meanTpm.m[ meanTpm.m$meanExpr > 0, ]
-numGenes <- ddply(
-    meanTpmFilt, .(stage),
-    summarize, numGenes = paste0( 'Total genes = ', length(stage) )
-  )
-numGenes$x = rep(10, nrow(numGenes) )
-numGenes$y = rep(14000, nrow(numGenes) )
-
-genesDistPlot <- ggplot(data=meanTpmFilt, aes(meanExpr) ) +
-  geom_histogram( binwidth = 1 ) +
-  geom_text( data = numGenes, aes(x, y, label=numGenes), size = 3 ) +
-  scale_x_log10() +
-  labs(x="Mean Expression (TPM)", y="Frequency",
-       title="Distribution of gene expression by stage") +
-  facet_wrap( ~ stage, nrow=3 ) +
-  theme_minimal() + 
-  theme( axis.text.x = element_text(size = rel(0.6) ),
-         strip.background = element_rect(fill="grey90", colour = "white")
-         )
-
-pdf( file.path(rootPath, 'plots', 'Figure.1-1.pdf'), width = 9, height = 6 )
-print(genesDistPlot)
-dev.off()
-
-print(genesDistPlot)
 ```
 
 ### Figure 1-2
@@ -1084,7 +953,7 @@ clusterGenes <- function( counts ){
 #' function to plot an expression heatmap using ggplot2
 #' 
 #' This is designed to plot a heatmap of a subset of the genes contributing 
-#'    to a particular prinicpal component. It expects the list of genes contributing 
+#'    to a particular principal component. It expects the list of genes contributing 
 #'    to PCs returned by runPCA and the PC number. You can optionally change the 
 #'    number of genes plotted and whether to cluster the subset before plotting
 #'    
@@ -1120,6 +989,67 @@ exprHeatmap <- function( PCNum, PCDataList, numGenes = 100, cluster = TRUE ){
                           legend.title = element_text(colour="black" ) )
   return(Heatmap)
 }
+
+#' profile_for_PC
+#' function to plot an expression profile using ggplot2
+#' 
+#' This is designed to plot an expression profile of a subset of the genes contributing 
+#'    most to a particular principal component. It expects the list of genes contributing
+#'    to PCs returned by runPCA and the PC number. You can optionally change the 
+#'    number of genes plotted
+#'    
+#' @param PCNum integer, index of the PC to plot
+#' @param PCDataList list, list of genes contributing to principal components
+#'    as returned by runPCA
+#' @param tpms matrix, tpm to use to plot profile
+#' @param numGenes integer, number of genes to plot (ordered by their contribution to the component)
+#'    default: 100
+#'
+#' @return Heatmap A ggplot2 object
+#'
+profile_for_PC <- function( PCNum, PCDataList, tpms, numGenes = 100, size = 2 ){
+  dataForPC <- PCDataList[[PCNum]]
+  # print(numGenes)
+  # print(dim(dataForPC))
+  # print(dim(tpms))
+  # get TPM for top 100 genes
+  # check gene exists in tpm data
+  genes <- rownames(dataForPC)[seq_len(numGenes)]
+  genes_in_tpm_list <- vector('list', length = numGenes)
+  genes_not_in_tpm_list <- vector('list', length = numGenes)
+  for( i in seq_len(numGenes) ){
+    gene <- genes[i]
+    if( any(rownames(tpms) == gene) ){
+      genes_in_tpm_list[[i]] <- gene
+    } else {
+      genes_not_in_tpm_list[[i]] <- gene
+    }
+  }
+  genes_in_tpm <- do.call(c,genes_in_tpm_list)
+  genes_not_in_tpm <- do.call(c,genes_not_in_tpm_list)
+  if( length(genes_not_in_tpm) > 0 ){
+    cat(sprintf('Some of the genes contributing to PC%d are not present in the TPM data. %s. Skipping ...\n', PCNum, paste(genes_not_in_tpm, sep = ", ") ) )
+  }
+  tpm_for_PC <- tpms[ genes_in_tpm, ]
+  tpm_for_PC_scaled <- scale(t(tpm_for_PC))
+  tpm_scaled_ByStageList <- split.data.frame(tpm_for_PC_scaled, rnaseqSampleInfo$condition)
+  tpm_scaled_MeanByStage <- do.call(cbind, lapply(tpm_scaled_ByStageList, colMeans))
+  
+  mean_tpm_scaled_MeanByStage <- melt(colMeans(tpm_scaled_MeanByStage))
+  mean_tpm_scaled_MeanByStage$stage <- rownames(mean_tpm_scaled_MeanByStage)
+  
+  tpm_scaled_MeanByStage <- melt(tpm_scaled_MeanByStage)
+  
+  profile_plot <- ggplot(data = tpm_scaled_MeanByStage) + 
+    geom_line(aes(x = Var2, y = value, group = Var1), 
+              colour = "grey70", size = size/4) + 
+    geom_line(data = mean_tpm_scaled_MeanByStage, aes(x = stage, y = value, group = 1), colour = "firebrick3", size = size/2) +
+    theme_minimal() + theme(axis.text.x = element_blank()) + 
+    labs(x = 'Stage', y = 'TPM (Mean Centred and Scaled)')
+
+  return(profile_plot)
+}
+
 ```
 
 ```{r pcaMatrixPlot}
@@ -1135,33 +1065,47 @@ exprHeatmap <- function( PCNum, PCDataList, numGenes = 100, cluster = TRUE ){
 #' @param PCDataList list, list of genes contributing to principal components
 #' @param pca object returned by prcomp 
 #' @param ddsRlog DESeqTransform, Rlog transformed data
-#' @param ... other parameters passed to exprHeatmap
+#' @param size number for size of points
+#' @param profile_type switch for type of plot for diagonal
+#'        one of 'profile' (line graph of expression profiles)
+#'            or 'heatmap' (heatmap of expression profiles)
+#' @param ... other parameters passed to exprHeatmap/profile_for_PC
 #'
 #' @return tpm A numeric matrix normalized by library size and feature length
 #'
-PCA_matrixPlot <- function( PCDataList, pca, ddsRlog, ... ){
+PCA_matrixPlot <- function( PCDataList, pca, ddsRlog, size = 2, 
+                            profile_type = 'heatmap', ... ){
   matrixPlotList <- vector( "list", length = length(PCDataList) * length(PCDataList) )
   propVarPC <- pca$sdev^2 / sum( pca$sdev^2 )
   # loop through PCs ( ones above varPCThreshold )
   for( firstPC in seq_len( length(PCDataList) ) ){
     for( secondPC in seq_len( length(PCDataList) ) ){
+      cat( sprintf('First PC:%d Second PC:%d\n', firstPC, secondPC) )
       # if firstPC == secondPC, plot expression heatmap
       # else plot firstPC against second PC
       if( firstPC == secondPC ){
-        plot <- exprHeatmap( firstPC, PCDataList, ... )
-        plot <- plot + theme( legend.position="none" )
+        if(profile_type == 'heatmap'){
+          plot <- exprHeatmap( firstPC, PCDataList, ... )
+        } else if(profile_type == 'profile'){
+          plot <- profile_for_PC( firstPC, PCDataList, size, ... )
+          plot <- plot + theme( axis.title = element_blank(),
+                                legend.position="none" )
+        }
       } else if( firstPC > secondPC ){
-        # blank plot
+        # blank spaceholder plot
         plot <- ggplot( data = data.frame() ) + geom_blank() + theme_void()
       } else{
-        plot <- PCA_plot( pca, propVarPC, firstPC, secondPC, ddsRlog )
+        plot <- PCA_plot( pca, propVarPC, firstPC, secondPC, ddsRlog,
+                          colourPalette = colourPalette, 
+                          shapePalette = shapePalette,
+                          size = size )
         plot <- plot + 
-          guides(colour = "none") + 
           theme( axis.title = element_blank(),
                  axis.text = element_blank(),
                  axis.ticks = element_blank(),
                  axis.line.x = element_line(colour="black"),
-                 axis.line.y = element_line(colour="black") )
+                 axis.line.y = element_line(colour="black"),
+                 legend.position="none" )
       }
       matrixPlotList[[ length(PCDataList)*(secondPC-1) + firstPC ]] <- plot
     }
@@ -1171,11 +1115,18 @@ PCA_matrixPlot <- function( PCDataList, pca, ddsRlog, ... ){
 
 pca <- pcaObj$pca
 PCDataList <- pcaObj$PCData
-matrixPlotList <- PCA_matrixPlot( PCDataList, pca, ddsRlog, numGenes = 100 )
+matrixPlotList <- PCA_matrixPlot( PCDataList, pca, ddsRlog, 
+                                  tpms = tpmFilt, numGenes = 100, size = 2 )
 
 # save as both pdf and eps
-matrixFile <- file.path(rootPath, 'plots', 'Figure.1-2.pdf' )
+matrixFile <- file.path(rootPath, 'plots', 'Fig.S2.pdf' )
 ggsave(matrixFile, width = 20, height = 20, marrangeGrob(matrixPlotList, nrow = 6, ncol = 6) )
+
+matrixPlotList <- PCA_matrixPlot( PCDataList, pca, ddsRlog, 
+                                  tpms = tpmFilt, numGenes = 100, size = 1 )
+matrixFile <- file.path(rootPath, 'plots', 'Fig.S2.eps' )
+ggsave(matrixFile, width = 7, height = 7, marrangeGrob(matrixPlotList, nrow = 6, ncol = 6), device = 'eps' )
+
 ```
 
 ```{r printPCAMatrixPlot, include=TRUE}
