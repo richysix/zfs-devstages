@@ -3197,8 +3197,8 @@ write.table(pfamInfo, file=file.path(rootPath, 'regionalExpression.PFAM.tsv'),
 
 ```
 
-## Figure 5
-### Fig5A
+## Figure 6
+### Fig6a
 #### Pearson histogram (Paralogues)
 ```{r load_data}
 # one-to-one-paralogues.txt is file produced from Ensembl Biomart
@@ -3263,7 +3263,6 @@ set.seed(10927475)
 sampleSize <- 3000
 row_nums <- sample(seq_len(nrow(geneCor)), sampleSize)
 col_nums <- sample(seq_len(nrow(geneCor)), sampleSize)
- <- rep(rownames(geneCor), nrow(geneCor)) 
 randomCor <- 
   do.call(rbind,
           lapply(seq_len(sampleSize),
@@ -3277,42 +3276,37 @@ randomCor <-
                  geneCor
           ) )
 
-randomCor <- data.frame( CorCoeff = sample(geneCor,sampleSize) )
-randomCor
+randomCor$type <- rep('random_sample', sampleSize)
+randomCor$gene1Name <- geneNames[ as.character(randomCor$gene1) ]
+randomCor$gene2Name <- geneNames[ as.character(randomCor$gene2) ]
+
 ```
 
 ```{r corHist, include=TRUE}
 # plot histogram
-CorHist <- ggplot(data = pairwiseCor) + 
-  geom_histogram( aes(x = CorCoeff), binwidth = 0.1 ) + 
-  labs( x = "Pearson Correlation Coefficient", y = "Frequency" ) +
+plot_data <- rbind(pairwiseCor, randomCor)
+plot_data$type <- factor(plot_data$type, levels = c('random_sample', 'paralogue_pairs'))
+CorHist <- ggplot(data = plot_data) + 
+  geom_density( aes(x = CorCoeff, fill = type ), colour = NA, alpha = 0.75 ) + 
+  scale_fill_manual(values = c('blue', 'red'), 
+                    labels = c('Random Sample', 'Paralogue Pairs'),
+                    guide = guide_legend(title = NULL)) + 
+  labs( x = "Pearson Correlation Coefficient", y = "Density" ) +
   theme_minimal()
-plotList <- add_to_plot_list( plotList, CorHist, 
-                              file.path(rootPath, 'plots', 'Figure.5a.pdf') )
-
 medianCor <- median(pairwiseCor$CorCoeff)
 
 print(CorHist)
+
+# plot to eps
+pdf(file = file.path(rootPath, 'plots', 'Fig.6a.pdf'),
+           width = 8, height = 8, paper = 'special')
+print(CorHist)
+dev.off()
 ```
 
-Histogram of Pearson coefficients between paralogous gene pairs (binwidth = 0.1)
+Kernel density estimate of Pearson coefficients between paralogous gene pairs
 
-### Fig5B
-#### Pearson histogram (random sample)
-
-```{r}
-randomHist <- ggplot( data = randomCor ) +
-  geom_histogram( aes(x = CorCoeff), binwidth=0.1 ) + 
-  labs( x = "Pearson Correlation Coefficient", y = "Frequency" ) + 
-  theme_minimal()
-plotList <- add_to_plot_list( plotList, randomHist, 
-                              file.path(rootPath, 'plots', 'Figure.5b.pdf') )
-print(randomHist)
-```
-
-Histogram of Pearson coefficients of a random selection of `r sampleSize` genes pairs.
-
-### Fig5C
+### Fig6b
 #### top10/bottom10 tpm heatmap
 ```{r plot_functions}
 # This function uses ggplotExprHeatmap to plot log10 tpm
@@ -3368,7 +3362,7 @@ getExprData <- function( genes, log = FALSE, scale = TRUE ){
 #'
 #' @return plot, ggplot2 object
 #'
-plotExprByStage <- function( genes, log = FALSE, scale = TRUE  ){
+plotExprByStage <- function( genes, log = FALSE, scale = TRUE, size = 0.8 ){
   plotData <- getExprData( genes, log = log, scale = scale  )
   if( scale ){
     y_label <- "Expression (TPM - Mean Centered and SD scaled)"
@@ -3378,7 +3372,7 @@ plotExprByStage <- function( genes, log = FALSE, scale = TRUE  ){
     y_label <- "Expression (TPM)"
   }
   plot <- ggplot( data = plotData ) + 
-    geom_point( aes( x = stageName, y = value, colour = Var2 ) ) +
+    geom_point( aes( x = stageName, y = value, colour = Var2 ), size = size ) +
     guides( colour = guide_legend(title = "Genes") ) + 
     scale_colour_manual( values = c("firebrick1", "steelblue3"), labels = as.character( unlist(genes[1,c("gene1Name", "gene2Name")]) )) + 
     labs( x = "Stage", y = y_label,
@@ -3452,42 +3446,52 @@ top10_bottom10Heatmap <- ggplot(data = top10_bottom10ExprData) +
     geom_raster( aes( y = Var2, x = stageName, fill = value ) ) + 
     scale_y_discrete( labels = genesCor$geneNames ) + 
     scale_fill_gradientn( colours = c("blue", "yellow", "red") ) + 
-    theme_void() + theme( legend.position="right",
-                          legend.title = element_text(colour="black"),
-                          axis.text.y = element_text(colour="black") )
-plotList <- 
-  add_to_plot_list( plotList, 
-                    top10_bottom10Heatmap,
-                    file.path(rootPath, 'plots', 'Figure.5c.pdf') )
+    theme_void() + theme( legend.position="bottom",
+                          legend.title = element_text(colour="black", angle = 0, debug = FALSE),
+                          axis.text.y = element_text(colour="black", angle = 0, debug = FALSE, size = 6) )
+postscript(file = file.path(rootPath, 'plots', 'Fig.6b.eps'),
+           width = 3, height = 4.5, paper = 'special', horizontal = FALSE)
 print(top10_bottom10Heatmap)
+dev.off()
 ```
 
-### Fig5D-G
+### Fig6c-f
 #### scatterplots/point based expression profiles
 
 ```{r ckm_exprPlots, include=TRUE}
 ckm_genes <- highlyCor[ grepl("ckm[ab]", highlyCor$gene1Name ), ]
 ckm_plot <- plotExprByStage( ckm_genes, 
                               log = FALSE, scale = FALSE )
-ckm_plot <- ckm_plot + theme( plot.title = element_blank() )
-plotList <- add_to_plot_list( 
-  plotList,
-  ckm_plot,
-  file.path(rootPath, 'plots', 'Figure.5d.pdf')
-)
+ckm_plot <- ckm_plot + theme( plot.title = element_blank(),
+                              axis.text = element_text(colour="black", angle = 0, debug = FALSE, size = 6),
+                              axis.title = element_text(colour="black", angle = 0, debug = FALSE, size = 7),
+                              legend.text = element_text(colour="black", angle = 0, debug = FALSE, size = 6),
+                              legend.title = element_text(colour="black", angle = 0, debug = FALSE, size = 7)
+                              )
+
+postscript(file = file.path(rootPath, 'plots', 'Fig.6c.eps'),
+           width = 4, height = 3, paper = 'special', horizontal = FALSE)
 print(ckm_plot)
+dev.off()
+
 ```
 
 ```{r ckm_scatterplot, include=TRUE}
 ckm_scatterplot <- make_scatterplot( ckm_genes )
 
-plotList <- add_to_plot_list( 
-  plotList,
-  ckm_scatterplot,
-  file.path(rootPath, 'plots', 'Figure.5e.pdf')
-)
+ckm_scatterplot <- ckm_scatterplot + 
+  theme( plot.title = element_blank(),
+         axis.text = element_text(colour="black", angle = 0, debug = FALSE, size = 12),
+         axis.title = element_text(colour="black", angle = 0, debug = FALSE, size = 14),
+         legend.text = element_text(colour="black", angle = 0, debug = FALSE, size = 12),
+         legend.title = element_text(colour="black", angle = 0, debug = FALSE, size = 14)
+  )
 
+postscript(file = file.path(rootPath, 'plots', 'Fig.6d.eps'),
+           width = 8, height = 6, paper = 'special', horizontal = FALSE)
 print(ckm_scatterplot)
+dev.off()
+
 ```
 
 
@@ -3495,26 +3499,37 @@ print(ckm_scatterplot)
 impdh1_genes <- negCor[ grepl("impdh1", negCor$gene1Name ), ]
 impdh1_plot <- plotExprByStage( impdh1_genes, 
                               log = FALSE, scale = FALSE )
-impdh1_plot <- impdh1_plot + theme( plot.title = element_blank() )
-plotList <- add_to_plot_list( 
-  plotList,
-  impdh1_plot,
-  file.path(rootPath, 'plots', 'Figure.5f.pdf')
-)
+impdh1_plot <- impdh1_plot + theme( plot.title = element_blank(),
+                              axis.text = element_text(colour="black", angle = 0, debug = FALSE, size = 6),
+                              axis.title = element_text(colour="black", angle = 0, debug = FALSE, size = 7),
+                              legend.text = element_text(colour="black", angle = 0, debug = FALSE, size = 6),
+                              legend.title = element_text(colour="black", angle = 0, debug = FALSE, size = 7)
+                              )
 
+postscript(file = file.path(rootPath, 'plots', 'Fig.6e.eps'),
+           width = 4, height = 3, paper = 'special', horizontal = FALSE)
 print(impdh1_plot)
+dev.off()
+
+
 ```
 
 ```{r impdh1_scatterplot, include=TRUE}
 impdh1_scatterplot <- make_scatterplot( impdh1_genes )
 
-plotList <- add_to_plot_list( 
-  plotList,
-  impdh1_scatterplot,
-  file.path(rootPath, 'plots', 'Figure.5g.pdf')
-)
+impdh1_scatterplot <- impdh1_scatterplot + 
+  theme( plot.title = element_blank(),
+         axis.text = element_text(colour="black", angle = 0, debug = FALSE, size = 12),
+         axis.title = element_text(colour="black", angle = 0, debug = FALSE, size = 14),
+         legend.text = element_text(colour="black", angle = 0, debug = FALSE, size = 12),
+         legend.title = element_text(colour="black", angle = 0, debug = FALSE, size = 14)
+  )
 
+postscript(file = file.path(rootPath, 'plots', 'Fig.6f.eps'),
+           width = 8, height = 6, paper = 'special', horizontal = FALSE)
 print(impdh1_scatterplot)
+dev.off()
+
 ```
 
 ```{r loadDETCTData}
