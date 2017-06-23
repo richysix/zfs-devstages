@@ -1167,6 +1167,8 @@ for (stage in stages){
 ```{r fig1-3, include=TRUE}
 # create sample correlation matrix
 detctSampleCor <- cor(counts(detctDESeqDataSet, normalized=TRUE))
+# detctSampleCor <- cor(counts(detctDESeqDataSet, normalized=TRUE)[, grepl('pool', colnames(counts(detctDESeqDataSet)))])
+# detctSampleCor <- cor(counts(detctDESeqDataSet, normalized=TRUE)[, !grepl('pool', colnames(counts(detctDESeqDataSet)))])
 
 # melt for ggplot
 detctSampleCor.m <- melt(detctSampleCor)
@@ -1178,16 +1180,65 @@ detctSampleCor.m$Var2 <- factor( detctSampleCor.m$Var2,
 detctSampleCorHeatmap <- ggplot(data = detctSampleCor.m) + 
   geom_tile( aes( x = Var1, y = Var2, fill = value ) ) + 
   scale_fill_gradientn( colours = c("blue", "yellow", "red"),
-                        guide = guide_colorbar(title = "Correlation\nCoefficient\n(Pearson)") ) + 
+                        guide = guide_colorbar(title = "Correlation\nCoefficient\n(Pearson)"),
+                        limits = c(0,1) ) + 
   theme_void() + theme( legend.position="right",
                         legend.title = element_text(colour='black' ),
                         axis.text.x = element_text(colour='black', angle = 90, 
-                                                   size = 0.5, hjust = 1 ) )
+                                                   size = 0.5, hjust = 1, debug = FALSE ) )
 
 plotList <- add_to_plot_list( plotList, 
                               detctSampleCorHeatmap, file.path(rootPath, 'plots', 'Figure.1-3.pdf') )
 
 print(detctSampleCorHeatmap)
+
+# Spearman
+detctSampleCor_spearman <- cor(counts(detctDESeqDataSet, normalized=TRUE), method = 'spearman')
+# melt for ggplot
+detctSampleCor_spearman.m <- melt(detctSampleCor_spearman)
+# reverse levels of y axis variable so that it plots sensibly
+detctSampleCor_spearman.m$Var2 <- factor( detctSampleCor_spearman.m$Var2,
+                            levels = rev(levels(detctSampleCor_spearman.m$Var2))
+  )
+# plot correlation matrix
+detctSampleCor_spearman_heatmap <- ggplot(data = detctSampleCor_spearman.m) + 
+  geom_tile( aes( x = Var1, y = Var2, fill = value ) ) + 
+  scale_fill_gradientn( colours = c("blue", "yellow", "red"),
+                        guide = guide_colorbar(title = "Correlation\nCoefficient\n(Spearman)"),
+                        limits = c(0,1) ) + 
+  theme_void() + theme( legend.position="right",
+                        legend.title = element_text(colour='black' ),
+                        axis.text.x = element_text(colour='black', angle = 90, 
+                                                   size = 0.5, hjust = 1, debug = FALSE ) )
+print(detctSampleCor_spearman_heatmap)
+
+pdf(file.path(rootPath, 'plots', 'Figure.1-3.spearman.pdf'))
+print(detctSampleCor_spearman_heatmap)
+dev.off()
+
+# how it looks to those with deuteranopia
+ggplot(data = detctSampleCor_spearman.m) + 
+  geom_tile( aes( x = Var1, y = Var2, fill = value ) ) + 
+  scale_fill_gradientn( colours = dichromat(c("blue", "yellow", "red")),
+                        guide = guide_colorbar(title = "Correlation\nCoefficient\n(Spearman)"),
+                        limits = c(0,1) ) + 
+  theme_void() + theme( legend.position="right",
+                        legend.title = element_text(colour='black' ),
+                        axis.text.x = element_text(colour='black', angle = 90, 
+                                                   size = 0.5, hjust = 1, debug = FALSE ) )
+
+# use viridis colour scheme
+pdf(file.path(rootPath, 'plots', 'Figure.1-3.spearman.viridis.pdf'))
+ggplot(data = detctSampleCor_spearman.m) + 
+  geom_tile( aes( x = Var1, y = Var2, fill = value ) ) + 
+  scale_fill_viridis( guide = guide_colorbar(title = "Correlation\nCoefficient\n(Spearman)"),
+                        limits = c(0,1) ) + 
+  theme_void() + theme( legend.position="right",
+                        legend.title = element_text(colour='black' ),
+                        axis.text.x = element_text(colour='black', angle = 90, 
+                                                   size = 0.5, hjust = 1, debug = FALSE ) )
+dev.off()
+
 ```
 
 ### Figure 1-4
