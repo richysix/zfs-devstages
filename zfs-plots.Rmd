@@ -7,7 +7,7 @@ output: html_document
 
 ```{r load_libraries, include=FALSE, message=FALSE }
 # checks whether packages are installed and trys to install them if not
-packages <-  c("knitr", "rprojroot", "ggplot2", "reshape2", 
+packages <-  c("knitr", "rprojroot", "ggplot2", "ggbio", "reshape2", 
                "scales", "GenomicFeatures", "plyr", "RColorBrewer",
                "cba", "topGO", "grid", "gridExtra", "Rgraphviz", "biomaRt", "htmlTable",
                "DESeq2", "genefilter", "qvalue", "rgl", "R2HTML" )
@@ -2958,23 +2958,138 @@ Histogram showing the distribution of genes in clusters 4, 22, 37 and 84, split 
 
 ### Figure 4-3A
 
+```{r manhattan, include=TRUE}
+# get chr lengths for seqinfo object
+fastaIndexFile <- '~/sanger/lustre/scratch110/sanger/rw4/genomes/Dr/GRCz10/striped/Danio_rerio.GRCz10.dna.toplevel.fa.fai'
+faidx <- read.table(file=fastaIndexFile, sep="\t", 
+                    colClasses=c("character", "integer", "integer", "integer", "integer"))
+names(faidx) <- c("Chr", "Length", "Idx", "LineLength", "LineLength2")
+GRCz10Chrs <- Seqinfo( seqnames=faidx$Chr, seqlengths=faidx$Length )
+# subset to just chr, remove scaffolds
+GRCz10Chrs <- keepSeqlevels(GRCz10Chrs, as.character(1:25))
+genome(GRCz10Chrs) <- 'GRCz10'
+
+# sort tpm by Chr and by Start
+tpmChrSorted <- tpmAnno[ order(tpmAnno$Chr, tpmAnno$Start), ]
+
+# make GRanges object
+GenesGR <- GRanges(
+  seqnames = Rle(tpmChrSorted$Chr),
+  ranges = IRanges(start = tpmChrSorted$Start, end = tpmChrSorted$End),
+  strand = Rle(tpmChrSorted$Strand),
+  GeneId = rownames(tpmChrSorted)
+)
+
+# function to calculate average pair-wise correlation
+# returns a data.frame with the info to create a GRanges object
+average_pairwise_sim <- function(index, gr, sim, chr, start_indices, end_indices, num_coeffs){
+  start_index <- start_indices[index]
+  end_index <- end_indices[index]
+  cor_coeffs <- numeric( length = num_coeffs )
+  coeff_i <- 1
+  for( i in start_index:(end_index - 1) ){
+    cor_coeffs[coeff_i:(coeff_i - 1 + end_index - i)] <- sim[(i + 1):end_index, i ]
+    coeff_i <- coeff_i + end_index - i
+  }
+  
+  return(
+    data.frame(
+      chr = chr,
+      start = start(gr)[start_index], 
+      end = end(gr)[end_index],
+      strand = '+',
+      avSim = mean(cor_coeffs)
+    )
+  )
+}
+
+# split GRanges by chr
+GenesGRbyChr <- split(GenesGR, seqnames(GenesGR))
+windowSize <- 10
+# list to store the GRanges object
+avSimbyChr <- vector('list', length = 25 )
+names(avSimbyChr) <- names(GenesGRbyChr)[1:25]
+for( chr in names(GenesGRbyChr)[1:25] ){
+  gr <- GenesGRbyChr[[chr]]
+  data <-  tpmChrSorted[ tpmChrSorted$Chr == chr, ]
+  sim <- cor(t(data[ , 9:98 ]))
+  start_indices <- seq_len(length(gr)+1-windowSize)
+  end_indices <- start_indices + windowSize - 1
+  num_coeffs <- windowSize * (windowSize - 1)/2
+  avSim <- lapply(seq_len(length(start_indices)),
+                  average_pairwise_sim,
+                  gr, sim, chr, start_indices, end_indices, num_coeffs)
+  avSim <- do.call(rbind, avSim)
+  # make new GRanges object
+  avSimbyChr[[chr]] <- GRanges(
+    seqnames = Rle(avSim$chr),
+    ranges = IRanges(start = avSim$start, end = avSim$end),
+    strand = Rle(avSim$strand),
+    seqinfo = GRCz10Chrs,
+    avSim = avSim$avSim,
+    mid_point = start_indices + (end_indices - start_indices) / 2
+  )
+}
+# make GRangesList and concat
+avSimGRL <- GRangesList(avSimbyChr)
+avSimGR <- unlist(avSimGRL)
+# add seqinfo
+seqinfo(avSimGR) <- GRCz10Chrs
+
+simThreshold <- 0.5
+manhattanPlot <- 
+  plotGrandLinear(avSimGR, aes(y = avSim), color = c('grey70', 'grey40')) + 
+  geom_hline( yintercept = simThreshold, colour = 'firebrick3', linetype = 2 ) + 
+  labs(x = 'Chromosome', y = 'Mean Pair-wise Correlation Coefficient') +
+  theme_minimal() + theme(legend.position = 'none')
+
+print(manhattanPlot)
+```
+
+```{r manhattan_plot, echo=FALSE}
+postscript(file = file.path(rootPath, 'plots', 'Fig.4a.eps'),
+           width = 12, height = 4, paper = 'special')
+print(
+  plotGrandLinear(avSimGR, aes(y = avSim), 
+                  color = c('grey70', 'grey40'), size = 0.5) + 
+  geom_hline( yintercept = simThreshold, colour = 'firebrick3', linetype = 2 ) + 
+  labs(x = 'Chromosome', y = 'Mean Pair-wise Correlation Coefficient') +
+  theme_minimal() + theme(legend.position = 'none')
+)
+dev.off()
+
+```
+
 ```{r regional_expr_plot, include=TRUE}
 # make a chromosomal order plot for every chromosome
 chrSpecificGeneExprList <- lapply( seq_len(25),
-                                   plotExprByChr )
-chrSpecificGeneExprPlotList <- lapply( chrSpecificGeneExprList, function(x){ x$plot } )
+                                   plotExprByChr, tpm = tpmFilt )
+names(chrSpecificGeneExprList) <- as.character(1:25)
 
 # print without y axis labels and legend
 # remove the position labels and unify colour scale across chrs
 maxtpm <- log10( max( sapply(chrSpecificGeneExprList, function(x){ max( x$tpms ) } ) ) )
 
-chrSpecificGeneExprPlotNoLegendList <- 
-  lapply( chrSpecificGeneExprPlotList,
-          function( x ){ 
-              x + scale_fill_gradientn( limits = c(0,maxtpm),
-                                        colours = c("blue", "yellow", "red") ) +  
-              labs(title=NULL) + 
-              theme( legend.position="none", axis.text.y = element_blank() ) } )
+# plot chr heatmap and similarity measure together
+chrSpecificGeneExprPlotNoLegendList <- vector('list', length = 25)
+names(chrSpecificGeneExprPlotNoLegendList) <- as.character(1:25)
+scaled_threshold <- -100 + simThreshold * 100
+for( chr in as.character(1:25) ){
+  cat( sprintf('Chr %d', chr) )
+  plot_data <- as.data.frame(mcols(avSimGRL[[chr]]))
+  plot_data$score_scaled <- -100 + plot_data$avSim * 100
+  chrSpecificGeneExprPlotNoLegendList[[chr]] <-
+    chrSpecificGeneExprList[[chr]]$plot +
+      geom_path(data = plot_data, aes(x = score_scaled, y = mid_point), size = 0.12) + 
+      geom_vline( xintercept = scaled_threshold, colour = "firebrick3", size = 0.25) +
+      scale_fill_gradientn( limits = c(0,maxtpm),
+                            colours = c("blue", "yellow", "red") ) + 
+      theme(plot.title = element_blank(),
+            axis.text.y = element_blank(),
+            legend.position="none")
+  print(chrSpecificGeneExprPlotNoLegendList[[chr]])
+}
+
 # resize each plot based on the number of genes for that chromosome 
 heights <- sapply( chrSpecificGeneExprList, function(x){ nrow( x$tpms) } )
 plotHeights <- heights/max(heights)
@@ -2990,13 +3105,128 @@ for( i in seq_len(length(chrSpecificGeneExprPlotNoLegendList)) ){
 
 # print one with a legend to get the legend
 postscript(file=file.path(rootPath, 'plots', paste0('Figure.4-3.chr1.chr-order.pluslegend.eps') ))
-chrSpecificGeneExprPlotList[[1]] + 
+chrSpecificGeneExprList[[1]]$plot + 
   scale_fill_gradientn( limits = c(0,maxtpm),
   colours = c("blue", "yellow", "red") )
 dev.off()
 ```
 
-### Figure 4-3 B-G
+### Get Peaks
+
+```{r collect_hits, include=TRUE}
+findHits <- function( chr, tpmChrSorted, chrSimList, windowSize, simThreshold ){
+  # cat(sprintf('Chr: %s\n', chr))
+  # get plot Data
+  plotData <- chrSimList[[chr]]
+  data <-  tpmChrSorted[ tpmChrSorted$Chr == chr, ]
+  # go through and aggregate runs that exceed the threshold
+  prevAboveThreshold <- FALSE
+  runsList <- vector( 'list' )
+  runsListIndex <- 1
+  runStart <- 0
+  i <- 1
+  for( aboveThreshold in plotData$avSim >= simThreshold ){
+    if( !prevAboveThreshold & !aboveThreshold ){
+      # between runs, carry on
+    } else if( prevAboveThreshold & !aboveThreshold ){
+      # end of a run
+      dataSubset <- data[ runStart:(i+windowSize-1), ]
+      runsList[[ runsListIndex ]] <- dataSubset
+      # cat( dim(dataSubset), "\n" )
+      runsListIndex <- runsListIndex + 1
+    } else if( !prevAboveThreshold & aboveThreshold ){
+      # start of a new run
+      runStart <- i
+    } else{
+      # in a run, carry on
+    }
+    # cat( paste(prevAboveThreshold, aboveThreshold, 
+               # i, runStart, runsListIndex,
+               # sep="\t"), "\n" )
+    prevAboveThreshold <- aboveThreshold
+    i <- i + 1
+  }
+  # go through peaks and merge overlapping regions
+  if ( length(runsList) == 0 ){
+    return( NULL )
+  } else if( length(runsList) > 1 ){
+    mergedList <- vector('list')
+    mergedListIndex <- 1
+    i <- 1
+    current_region <- runsList[[i]] # this is the first region
+    i <- 2
+    while(i <= length(runsList)){
+      # cat('i:', i, "\n")
+      next_region <- runsList[[i]]
+      # compare the current region to the next one
+      if ( next_region$Start[1] <= current_region$End[nrow(current_region)] ) {
+        # if they overlap merge them, set current region to the merged region
+        overlap <- TRUE
+        current_region <- 
+          rbind( current_region,
+                 next_region[ setdiff(rownames(next_region), rownames(current_region)), ] )
+        i <- i + 1
+      } else {
+        # if they don't, add the current region to the list and set the next region to be the new current region
+        overlap <- FALSE
+        mergedList[[mergedListIndex]] <- current_region
+        mergedListIndex <- mergedListIndex + 1
+        current_region <- next_region
+        i <- i + 1
+      }
+    }
+    # check the status of the overlap
+    # if the last 2 regions overlapped add the current region to the list
+    # if not add next region
+    if (overlap) {
+      mergedList[[mergedListIndex]] <- current_region
+    } else {
+      mergedList[[mergedListIndex]] <- next_region
+    }
+    # return
+    return(mergedList)
+  } else {
+    return(runsList)
+  }
+}
+
+plotSubset <- function( dataSubset, chr ){
+  exprMatrix <- as.matrix(log10(dataSubset[,8:97]+1))
+  # reverse rows of matrix
+  exprMatrix <- exprMatrix[seq(nrow(exprMatrix),1,-1), ]
+  rowLabels <- rev(as.character(dataSubset$GeneName))
+
+  # put chr and region on plot
+  title_text <- paste0('Chr ', chr, ' (', dataSubset$Start[1], '-', dataSubset$End[length(dataSubset$End)], ')')
+  heatmap <- ggplotExprHeatmap( exprMatrix, rowLabels = rowLabels ) +
+              labs(title = title_text ) + 
+              theme( axis.text.y = element_text( colour = "black", angle = 0, debug = FALSE),
+                     plot.title = element_text( colour = "black", angle = 0, debug = FALSE) )
+  return(heatmap)
+}
+
+outputResults <- function(chr, peaksList){
+  # cat(chr, "\n")
+  dataList <- peaksList[[chr]]
+  plotList <- lapply(dataList, plotSubset, chr)
+  for( peakNum in seq_len(length(dataList))){
+     file <- file.path(outputDir, paste0('chr', chr, '-peak', peakNum, '.tsv') )
+     write.table(dataList[[peakNum]][,1:7], file=file, sep="\t", row.names = TRUE, col.names = TRUE, quote = FALSE)
+  }
+  return( plotList )
+}
+
+# simThreshold is defined in block `plot_similarity`
+windowSize <- 10
+peaksList <- lapply( seq_len(25), findHits, 
+                     tpmChrSorted, chrSimList, 
+                     windowSize, simThreshold )
+
+plots <- lapply( seq_len(25), outputResults, peaksList )
+plots
+
+```
+
 ```{r fig.4.3b-g, include=TRUE}
 selectedRegions <- list(
   crystallins = list( chr = "9", start = 22082881, end = 22866634 ),
