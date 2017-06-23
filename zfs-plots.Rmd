@@ -414,10 +414,6 @@ tpmFilt <- tpm[genesAboveThreshold, ]
 tpmAnno <- merge( mcols(dds), tpmFilt, 
                   by.x = c('e85.Ensembl.Gene.ID'),
                   by.y = 0 )
-tpmAnno <- data.frame(
-  ID = tpmAnno[['Gene.name']],
-  tpmAnno
-)
 outFilename <- file.path(rootPath, 'output', 'zfs-grcz10.tpm.tsv')
 write.table(tpmAnno, file = outFilename, quote = FALSE, sep = "\t",
             col.names = FALSE, row.names = FALSE)
@@ -1223,17 +1219,6 @@ dev.off()
 ## Figure 3
 ### Fig3A
 #### Max Stage Clusters TPM heatmap
-```{r filter_tpms, include=TRUE}
-# split by gene
-tpmByGene <- split( tpm, rownames(tpm) )
-# reshape to matrix 18 x 5
-tpmByGeneMat <- lapply(tpmByGene, function(x){ matrix(x,nrow=5) })
-
-# filter genes by which ones have tpm > 0 in all 5 samples of at least one stage
-genesNonZero <-  lapply(tpmByGeneMat, function(x){ any( colSums( x > 0 ) >= 5 ) } )
-genesToKeep <- unlist(genesNonZero)
-tpmFilt <- tpm[ genesToKeep, ]
-```
 
 ```{r cluster_func}
 #' getGenesForStage
@@ -1298,7 +1283,7 @@ clusterByGenes <- function( stageIndex, countsByStageList ){
 #'    
 #' @param exprMatrix matrix, count matrix to plot
 #'    rows are genes, columns are samples
-#' @param legendPosition character, one of 'left', 'right', 'top' or 'bottom'
+#' @param legendPosition character, one of 'left', 'right', 'top', 'bottom' or 'none'
 #'
 #' @return Heatmap ggplot2 object
 #'
@@ -1353,16 +1338,26 @@ geneMax <- apply(tpmByStageClustered, 1, max)
 tpmByStageClusteredMaxScaled <- t(scale( t(tpmByStageClustered), center = FALSE, scale = geneMax ))
 
 # plot heatmap clustered
-tpmMSHeatmap <- ggplotExprHeatmap( tpmByStageClusteredMaxScaled, legendPosition = 'left' )
+tpmMSHeatmap <- ggplotExprHeatmap( tpmByStageClusteredMaxScaled, legendPosition = 'right' )
 # Change colour bar title
-tpmMSHeatmap <- tpmMSHeatmap + guides( fill = guide_colorbar(title = "tpm\n(max scaled)" ) )
+tpmMSHeatmap <- tpmMSHeatmap + guides( fill = guide_colorbar(title = "TPM\n(max scaled)" ) )
 
-# add to plot list
-plotList <- add_to_plot_list( plotList, 
-                              tpmMSHeatmap, 
-                              file.path(rootPath, 'plots', 'Figure.3a-tpm-heatmap.pdf') )
+# do one with legend and one without
+postscript(file.path(rootPath, 'plots', 'Fig.3a.tpm-heatmap.eps'),
+           width = 5, height = 5 )
+print(tpmMSHeatmap)
+dev.off()
 
-print( tpmMSHeatmap )
+postscript(file.path(rootPath, 'plots', 'Fig.3a.tpm-heatmap.nolegend.ps'),
+           width = 3, height = 5 )
+ggplotExprHeatmap( tpmByStageClusteredMaxScaled, legendPosition = 'none' )
+dev.off()
+
+postscript( file = file.path(rootPath, 'plots', 'Fig.3a.tpm_heatmap.ps'),
+           width = 3, height = 5 )
+print(tpmMSHeatmap)
+dev.off()
+
 ```
 
 ```{r getGeneNames}
