@@ -3207,18 +3207,11 @@ colNames <- c("paralogue1ID", "paralogue1Name", "paralogue2Name", "paralogue2ID"
                                 "homologyType", "lastCommonAncestor", "gene1.pc.ID", "gene2.pc.ID" )
 paraloguesData <- read.table(paraloguesFile, sep="\t",
                              col.names = colNames)
-
-# set stage colour palette
-numLevels <- nlevels(rnaseqSampleInfo$stageName)
-ord1 <- seq(1,numLevels,2)
-ord2 <- seq(2,numLevels,2)
-colourPalette <- hue_pal()(numLevels)[ order(c(ord1,ord2)) ]
-
 ```
 
 ```{r correlation, include=TRUE}
 # use tpms
-data <- tpm
+data <- tpmFilt
 # # or normalised counts
 # data <- counts(dds, normalized = TRUE )
 # rownames(data) <- mcols(dds)[ , geneIdColumnName ]
@@ -3249,19 +3242,43 @@ pairwiseCorList <- lapply( seq_len(nrow(paraloguesData)),
 
 pairwiseCor <- do.call( rbind, pairwiseCorList )
 pairwiseCor <- pairwiseCor[!is.na(pairwiseCor$CorCoeff),]
+pairwiseCor$type <- rep('paralogue_pairs', nrow(pairwiseCor))
 ```
 
-```{r addGeneNames}
+```{r addGeneNames, eval=FALSE}
 # get gene names and add to pairwiseCor
 pairwiseCor$gene1Name <- geneNames[ as.character(pairwiseCor$gene1) ]
 pairwiseCor$gene2Name <- geneNames[ as.character(pairwiseCor$gene2) ]
-
 ```
 
 ```{r output}
 # ouput list ordered by correlation coeff
 pairwiseCorSorted <- pairwiseCor[ order(pairwiseCor$CorCoeff), ]
 write.table(pairwiseCorSorted, file = "ZF-Paralogues.pearson.tsv", quote = FALSE, sep="\t", row.names = FALSE )
+```
+
+```{r randomCor, include=TRUE}
+# plot histogram oif randomly selected gene pairs
+set.seed(10927475)
+sampleSize <- 3000
+row_nums <- sample(seq_len(nrow(geneCor)), sampleSize)
+col_nums <- sample(seq_len(nrow(geneCor)), sampleSize)
+ <- rep(rownames(geneCor), nrow(geneCor)) 
+randomCor <- 
+  do.call(rbind,
+          lapply(seq_len(sampleSize),
+                 function(x, geneCor){
+                   data.frame(
+                     gene1 = rownames(geneCor)[row_nums[x]],
+                     gene2 = rownames(geneCor)[col_nums[x]],
+                     CorCoeff = geneCor[row_nums[x], col_nums[x]]
+                   )
+                 },
+                 geneCor
+          ) )
+
+randomCor <- data.frame( CorCoeff = sample(geneCor,sampleSize) )
+randomCor
 ```
 
 ```{r corHist, include=TRUE}
@@ -3283,11 +3300,7 @@ Histogram of Pearson coefficients between paralogous gene pairs (binwidth = 0.1)
 ### Fig5B
 #### Pearson histogram (random sample)
 
-```{r randomCor, include=TRUE}
-# plot histogram oif randomly selected gene pairs
-set.seed(10927475)
-sampleSize <- 3000
-randomCor <- data.frame( CorCoeff = sample(geneCor,sampleSize) )
+```{r}
 randomHist <- ggplot( data = randomCor ) +
   geom_histogram( aes(x = CorCoeff), binwidth=0.1 ) + 
   labs( x = "Pearson Correlation Coefficient", y = "Frequency" ) + 
