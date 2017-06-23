@@ -1954,7 +1954,7 @@ colnames(cluster_info) <- c('Cluster', 'Size', 'Number GO Terms enriched',
     'Expression Profile')
 
 html_table_file <- file.path(rootPath, 'output', 'biolayout-clusters.html')
-css_file <- gsub('^', '"', file.path(rootPath, 'output', 'biolayout-clusters.css') )
+css_file <- gsub('^', '"', file.path('biolayout-clusters-files', 'biolayout-clusters.css') )
 css_file <- gsub('$', '"', css_file)
 cat('<html>\n', '<head><title>BioLayout Clusters</title>\n',
   '<meta charset="UTF-8"></head>\n',
