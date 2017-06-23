@@ -71,6 +71,7 @@ then
   # download and unzip GTF file
   curl -O $gtfLink
   gunzip $gtfFile.gz
+  mv $gtfFile dataFiles/
 fi
 ```
 
@@ -292,7 +293,7 @@ dev.off()
 # check for the existence of Transcript info
 # Ensembl version is set at the top of the script
 TranscriptsFile <- file.path(rootPath, 'dataFiles', 'rnaseq', paste0('Danio_rerio.e', ensVersion, '.transcript.lengths.tsv') )
-gtfFile <- file.path(rootPath, paste0('Danio_rerio.GRCz10.', ensVersion, '.gtf') )
+gtfFile <- file.path(rootPath, paste0('dataFiles', 'Danio_rerio.GRCz10.', ensVersion, '.gtf') )
 
 if( file.exists(TranscriptsFile) ){
   TxInfo <- read.table(file=TranscriptsFile, sep="\t", row.names = 1)
