@@ -3611,6 +3611,121 @@ plotList <- add_to_plot_list(
 print(impdh1_scatterplot)
 ```
 
+```{r loadDETCTData}
+detctDataFile <- file.path(rootPath, 'dataFiles', 'detct', 'DESeq.zfs.detct.grcz10.RData')
+# load from file if it exists
+if( file.exists(detctDataFile) ){
+  load(detctDataFile)
+} else {
+  dataFile <- file.path(rootPath, 'dataFiles', 'detct', 'zfs-detct-grcz10.tsv')
+  if( !file.exists(dataFile) ){
+    stop("DETCT counts data file is not present! Please download from figshare. See README.")
+  }
+  detctData <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"",
+                     comment.char = "%")
+  rownames(detctData) <- paste(detctData[,1], detctData[,2], detctData[,3], detctData[,5], sep=":")
+  countData <- detctData[ , grepl("zmp.*count", colnames(detctData) ) &
+                            !grepl("normalised", colnames(detctData) ) ]
+  colnames(countData) <- gsub(".count", "", colnames(countData) )
+
+  # sample Info
+  detctSampleInfoFile <- file.path(rootPath, 'dataFiles', 'detct', 'zfs-detct-sampleInfo.tsv')
+  detctSampleInfo <- read.table(detctSampleInfoFile, sep="\t", header=TRUE,
+                                colClasses = c('character', 'character', 'character', 
+                                          'factor', 'factor', 'factor', 'character' ) )
+  rownames(detctSampleInfo) <- detctSampleInfo$sample
+  
+  # make colourGroup
+  stageGroupNames <- c("pre-ZGA", "Gastrula", "Somitogenesis", "Prim-stages", "2-5dpf")
+  colourGroupNames <- 
+    c(paste0(stageGroupNames[1], '-', 1:4),
+      paste0(stageGroupNames[2], '-', 1:4),
+      paste0(stageGroupNames[3], '-', 1:3),
+      paste0(stageGroupNames[4], '-', 1:3),
+      paste0(stageGroupNames[5], '-', 1:4) )
+  names(colourGroupNames) <- levels(detctSampleInfo$condition)
+  colourGroup <- character( length = nrow(detctSampleInfo) )
+  for( i in seq_len(length(colourGroupNames)) ){
+    colourGroup[ detctSampleInfo$condition == names(colourGroupNames)[i] ] <- colourGroupNames[i]
+  }
+  detctSampleInfo$colourGroup <- factor( colourGroup,
+                                          levels = unique(colourGroup) )
+  detctSampleInfo$stageGroup <- 
+    factor( gsub("-[1-5]$", "", colourGroup),
+            levels = c("pre-ZGA", "Gastrula", "Somitogenesis", "Prim-stages", "2-5dpf") )
+  
+  # order by countData column names
+  detctSampleInfo <- detctSampleInfo[ colnames(countData), ]
+  # set levels of stageName
+  detctSampleInfo$stageName <- factor( detctSampleInfo$stageName,
+                                  levels = unique(detctSampleInfo$stageName) )
+  # relabel colnames with sample names
+  colnames(countData) <- detctSampleInfo$sampleName
+  colnames(countData) <- 
+    gsub(" ", "-", colnames(countData))
+  # row names of sample info must match count data column names
+  rownames(detctSampleInfo) <- detctSampleInfo$sampleName
+  
+  # make DESeq object and do vst transform
+  detctDESeqDataSet <- DESeqDataSetFromMatrix(countData, detctSampleInfo, design = ~ condition)
+  featureData <- detctData[ , !grepl("count", colnames(detctData)) | grepl("3..end.read.count", colnames(detctData)) ]
+  mcols(detctDESeqDataSet) <- DataFrame(mcols(detctDESeqDataSet), 
+                                        region = rownames(featureData),
+                                        featureData
+                                        )
+  detctDESeqDataSet <- estimateSizeFactors(detctDESeqDataSet)
+  detctDESeqDataSetVst <- varianceStabilizingTransformation(detctDESeqDataSet, blind=TRUE)
+  
+  # save objects to file for reloading
+  save(detctData, detctSampleInfo, detctDESeqDataSet, detctDESeqDataSetVst, file=detctDataFile)
+}
+
+```
+
+```{r reads_mapped_DETCT}
+# DETCT data
+# This data comes from running samtools flagstat on each bam file and then selecting the entry for properly paired reads
+# e.g. grep properly $sample.markdup.flagstat.txt | awk '{ print "'$sample'", $1 }'
+detctReadDataFile <- file.path(rootPath, 'dataFiles', 'detct', 'zfs-detct.read-pairs-mapped.tsv' )
+detctReadData <- read.table(file=detctReadDataFile, sep="\t", header=FALSE)
+colnames(detctReadData) <- c('sample', 'value')
+sampleType <- rep('DETCT single', nrow(detctReadData))
+sampleType[grepl('pool', detctReadData$sample)] <- 'DETCT pool'
+detctReadData$sampleType <- factor( sampleType,
+                                   levels = c('RNA-Seq', 'DETCT single', 'DETCT pool') )
+detctReadDataMerged <- merge(detctReadData, detctSampleInfo)
+```
+
+```{r detct_genes_detected, eval=FALSE}
+detctCounts <- counts(detctDESeqDataSet, normalized = TRUE)
+countThreshold <- 5
+# collect data on how many genes are detected in each sample
+# Each gene is potentially represented by multiple regions
+# Count as detected if any of the regions for a gene is above threshold
+detctGenesDetectedBySampleList <- vector('list', length = nlevels(detctData$e86.Ensembl.Gene.ID) - 1 )
+j <- 1
+for (gene in levels(detctData$e86.Ensembl.Gene.ID) ) {
+  if (gene == "-") {
+    next
+  }
+  counts <- detctCounts[rownames(detctData)[ detctData$e86.Ensembl.Gene.ID == gene ], , drop = FALSE]
+  aboveThreshold <- counts >= countThreshold
+  aboveThresholdList <- split.data.frame(aboveThreshold, rownames(aboveThreshold))
+  detctGenesDetectedBySampleList[[j]] <- Reduce('|', aboveThresholdList)
+  j <- j + 1
+}
+detctGenesDetectedBySampleByGene <- do.call(rbind, detctGenesDetectedBySampleList)
+detctGenesDetectedBySample <- melt(colSums(detctGenesDetectedBySampleByGene))
+detctGenesDetected <- data.frame(
+  sampleName = rownames(detctGenesDetectedBySample),
+  sampleType = rep('DETCT', nrow(detctGenesDetectedBySample) ),
+  threshold = rep(countThreshold, nrow(detctGenesDetectedBySample)),
+  genes = detctGenesDetectedBySample$value
+)
+detctGDData <- merge(detctGenesDetected, detctSampleInfo )
+
+```
+
 ### Fig.6C
 
 #### Count bar chart by Stage
