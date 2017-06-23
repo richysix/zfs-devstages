@@ -10,10 +10,11 @@ dataFiles/AllGenes.85.biomart.tsv
 dataFiles/rnaseq/chr4_ZnF.uniq.txt
 dataFiles/detct/zfs-detct-grcz10.tsv
 dataFiles/rnaseq/zfs-rnaseq-grcz10.tsv
+dataFiles/annotation.txt
+dataFiles/paralogues-Biomart.txt
 *DS_Store*
 workspace.RData
 regionalExpression.PFAM.tsv
 pdb_pfam_mapping.txt
-dataFiles/paralogues-Biomart.txt
 zfs-plots_files/*
 output/*
