@@ -10,10 +10,11 @@ output: html_document
 packages <-  c("knitr", "rprojroot", "ggplot2", "reshape2", 
                "scales", "GenomicFeatures", "plyr", "RColorBrewer",
                "cba", "topGO", "grid", "gridExtra", "Rgraphviz", "biomaRt", "htmlTable",
-               "DESeq2", "genefilter", "qvalue", "rgl" )
+               "DESeq2", "genefilter", "qvalue", "rgl", "R2HTML" )
 for( package in packages ){
   if(!require( package, character.only = TRUE )){
     install.packages( package )
+    require( package, character.only = TRUE )
   }
 }
 ```
@@ -1595,6 +1596,10 @@ ZFAData$Tissue <- factor( as.character( ZFAData$Tissue ),
                             "liver", "yolk", "YSL", "yolk ball/extension", "NULL"
                             )
 )
+
+# calculate log2FC enrichment
+ZFAData$log2FCEnriched <- log2( ZFAData$Significant/ZFAData$Expected )
+
 ```
 
 ```{r heatmap_pvalue_germlayer}
@@ -1834,6 +1839,238 @@ done
 done
 ```
 
+### GO Enrichment on biolayout clusters
+
+```{r loadClusterData}
+# read in cluster data
+clusterFile <- file.path(rootPath, 'dataFiles', 'zfs-grcz10.tpm_r-0.94_pearson.cluster.info.txt')
+clusterData <- read.table(clusterFile, sep="\t", header=TRUE)
+rownames(clusterData) <- as.character( clusterData$gene_id )
+# get cluster info
+# split clusterData by cluster
+clusters <- split(clusterData, clusterData$cluster)
+```
+
+```{r}
+topgo_results_file <- file.path(rootPath, 'output/topgo/0.94-e85-fisher/topGOResults.sig.tsv')
+topgo_results <- read.table(topgo_results_file, sep = "\t", header = TRUE)
+
+pdf(file = file.path(rootPath, 'plots', 'biolayout-topgo-summary-plots.pdf'))
+ggplot(data = topgo_results) + 
+  geom_histogram( aes(x = cluster), stat = 'count' ) +
+  labs(x = 'Cluster', y = 'Number of GO terms enriched') +
+  theme( axis.text.x = element_blank(),
+         axis.ticks.x = element_blank() )
+
+topgo_summary <- ddply(topgo_results, .(cluster), summarise, 
+                       number_enrichments = length(GO.ID),
+                       number_annotations = sum(Annotated))
+
+cluster_sizes <- as.integer(table(clusterData$cluster)[ topgo_summary$cluster ])
+topgo_summary$size <- cluster_sizes
+
+ggplot(data = topgo_summary) + 
+  geom_point( aes(x = size, y = number_enrichments) ) +
+  labs(x = 'Cluster Size', y = 'Number of GO terms enriched')
+
+ggplot(data = topgo_summary) + 
+  geom_point( aes(x = size, y = number_annotations) ) + 
+  labs(x = 'Cluster Size', y = 'Number of Gene to GO term annotations')
+
+ggplot(data = topgo_summary) + 
+  geom_point( aes(x = number_annotations, y = number_enrichments, size = size) ) +
+  labs(x = 'Number of Annotations to genes in cluster',
+       y = 'Number of GO enrichments')
+
+topgo_summary_by_domain <- 
+  ddply(topgo_results, .(cluster, domain), summarise, 
+        number_enrichments = length(GO.ID),
+        number_annotations = sum(Annotated))
+cluster_sizes <- as.integer(table(clusterData$cluster)[ topgo_summary_by_domain$cluster ])
+topgo_summary_by_domain$size <- cluster_sizes
+
+ggplot(data = topgo_summary_by_domain) + 
+  geom_point( aes(x = number_annotations, y = number_enrichments, size = size) ) +
+  facet_wrap( ~ domain, ncol = 1) +
+  labs(x = 'Number of Annotations to genes in cluster',
+       y = 'Number of GO enrichments')
+
+dev.off()
+
+
+# collapse GO terms down to highest-level term that is unique at that level
+collapse_GO <- function(cluster_go){
+  subtree_sizes <- table(cluster_go$SubtreeNumber)
+  top_unique_levels <- vector('list', length = length(subtree_sizes))
+  i <- 1
+  for( subtree_number in names(subtree_sizes)){
+    subtree <- cluster_go[cluster_go$SubtreeNumber == subtree_number, ]
+    if (subtree_sizes[subtree_number] == 1) {
+      top_unique_levels[[i]] <- subtree
+    }
+    tree_levels <- table(subtree$Level)
+    # print(tree_levels)
+    prev_level <- NULL
+    top_unique_level <- NULL
+    for( level in names(tree_levels) ){
+      if(tree_levels[[level]] > 1){
+        if(is.null(prev_level)){
+          cat(sprintf('Cluster: %s, Domain: %s, Subtree: %s, Level: %s\n', 
+                      cluster_go$cluster[1], cluster_go$domain[1], 
+                      subtree_number, tree_levels))
+          stop('Gone too far')
+        } else {
+          top_unique_level <- prev_level
+          break
+        }
+      } else {
+        prev_level <- level
+      }
+    }
+    if(is.null(top_unique_level)){
+      top_unique_level <- prev_level
+    }
+    # cat(sprintf('Cluster: %s Domain: %s Subtree: %s TopLevel: %s\n', 
+    #                   cluster_go$cluster[1], cluster_go$domain[1], 
+    #                   subtree_number, top_unique_level))
+    top_unique_levels[[i]] <- subtree[subtree$Level == top_unique_level, ]
+    i <- i + 1
+  }
+  return(do.call(rbind, top_unique_levels))
+}
+
+collapsed_go_results <- 
+  do.call(rbind,
+          lapply(split(topgo_results, topgo_results$cluster),
+            function(cluster_subset){
+                do.call(rbind,
+                        lapply(split(cluster_subset, cluster_subset$domain),
+                        collapse_GO))
+            }
+          )
+  )
+
+# output collapsed results
+topgo_collapsed_results_file <- file.path(rootPath, 'output/topgo/0.94-e85-fisher/topGOResults.sig.collapsed.tsv')
+write.table(collapsed_go_results, topgo_collapsed_results_file,
+            quote = FALSE, row.names = FALSE, col.names = TRUE, sep = "\t")
+
+
+# topgo_results_file <- file.path(rootPath, 'output/topgo/0.94-e85/topGOResults.sig.tsv')
+# topgo_results <- read.table(topgo_results_file, sep = "\t", header = TRUE)
+# collapsed_go_results <- 
+#   do.call(rbind,
+#           lapply(split(topgo_results, topgo_results$cluster),
+#             function(cluster_subset){
+#                 do.call(rbind,
+#                         lapply(split(cluster_subset, cluster_subset$domain),
+#                         collapse_GO))
+#             }
+#           )
+#   )
+# # output collapsed results
+# topgo_collapsed_results_file <- file.path(rootPath, 'output/topgo/0.94-e85/topGOResults.sig.collapsed.tsv')
+# write.table(collapsed_go_results, topgo_collapsed_results_file,
+#             quote = FALSE, row.names = FALSE, col.names = TRUE, sep = "\t")
+# 
+```
+
+```{r cluster_exp_profiles, include=TRUE}
+meanTpmByStage <- 
+  t( do.call('rbind',
+              lapply(tpmFiltByStageList, colMeans) ) )
+
+# for each cluster, get mean Tpm for genes, scaled and center and plot
+for( cluster_num in seq_len(length(clusters))){
+  meanTpm_for_cluster <- meanTpmByStage[as.character(clusters[[cluster_num]]$gene_id), ]
+  profile_data <- melt(colMeans(t(scale(t(meanTpm_for_cluster)))))
+  profile_data$stage <- factor( row.names(profile_data),
+                                levels = row.names(profile_data) )
+  
+  cluster_profile_file <- file.path(rootPath, 'output', 'biolayout-clusters-files', 
+                                    sprintf('Cluster%03d.png', cluster_num) )
+  png(cluster_profile_file, width = 144, height = 144)
+  print(ggplot(data = profile_data, aes(x = stage, y = value, group = 1) ) + 
+    geom_path(size = 1.5, colour = 'firebrick3') +
+    theme_minimal() +
+    theme( axis.text.x = element_blank(),
+           axis.title = element_blank() ))
+  dev.off()
+}
+
+# tpm_for_cluster <- tpmFilt[as.character(clusters[[254]]$gene_id), ]
+# profile_data <- melt(colMeans(t(scale(t(tpm_for_cluster)))))
+# profile_data$sample <- row.names(profile_data)
+# profile_data$stage <- factor( sub('-[0-9]$', '', profile_data$sample),
+#                               levels = unique(sub('-[0-9]$', '', profile_data$sample)) )
+
+```
+
+```{r load_biolayout_zfa_data}
+zfa_file <- file.path(rootPath, 'output', 'zfa', '0.94-e85', 'zfa.e85.sig.tsv')
+biolayout_zfa_data <- read.table(zfa_file, sep = "\t", header=TRUE, quote = "\"")
+# remove "unspecified"
+biolayout_zfa_data <- biolayout_zfa_data[ !(biolayout_zfa_data$ID == 'ZFA:0001093'), ]
+```
+
+```{r make_html_table, include=TRUE}
+cluster_info_list <- vector('list', length = length(clusters))
+for( cluster_num in seq_len(length(clusters))){
+  cluster_name <- sprintf('Cluster%03d', cluster_num)
+  cluster_size <- nrow(clusters[[cluster_num]])
+  go_results <- collapsed_go_results[ collapsed_go_results$cluster == cluster_name, ]
+  if(nrow(go_results) == 0){
+    go_terms <- 'NA'
+  } else {
+    go_terms <- paste(go_results$Term, paste0('(', go_results$GO.ID, ')'), 
+                      sep = ' ', collapse = '<br>')
+  }
+  
+  # ZFA
+  zfa_for_cluster <- biolayout_zfa_data[ biolayout_zfa_data$Cluster == cluster_name, ]
+  if(nrow(zfa_for_cluster) == 0){
+    num_zfa_terms <- 'NA'
+    zfa_terms <- 'NA'
+  } else {
+    num_zfa_terms <- nrow(zfa_for_cluster)
+    zfa_terms <- paste(zfa_for_cluster$name, paste0('(', zfa_for_cluster$ID, ')'), 
+                      sep = ' ', collapse = '<br>')
+  }
+  
+  cluster_profile_tag <- 
+    paste0('<img src="',
+            file.path('biolayout-clusters-files',
+              sprintf('Cluster%03d.png', cluster_num) ),
+            '">'
+    )
+
+  cluster_info_list[[cluster_num]] <- data.frame(
+    Cluster = cluster_name,
+    Size = cluster_size,
+    Num_GO = nrow(go_results),
+    GO_Terms = go_terms,
+    Num_ZFA = num_zfa_terms,
+    ZFA_Terms = zfa_terms,
+    Profile = cluster_profile_tag
+  )
+}
+
+cluster_info <- do.call(rbind, cluster_info_list)
+colnames(cluster_info) <- c('Cluster', 'Size', 'Number GO Terms enriched',
+    'Enriched GO Terms', 'Number ZFA Terms enriched', 'Enriched ZFA Terms',
+    'Expression Profile')
+
+html_table_file <- file.path(rootPath, 'output', 'biolayout-clusters.html')
+css_file <- gsub('^', '"', file.path(rootPath, 'output', 'biolayout-clusters.css') )
+css_file <- gsub('$', '"', css_file)
+cat('<html>\n', '<head><title>BioLayout Clusters</title>\n',
+  '<meta charset="UTF-8"></head>\n',
+  '<body>\n', file = html_table_file, append = FALSE )
+HTMLCSS(file = html_table_file, CSSfile = css_file)
+HTML.title("Table of BioLayout Cluster Information", file = html_table_file)
+HTML(cluster_info, file = html_table_file, row.names = FALSE, Border = 0)
+cat('</body></html>\n', file = html_table_file, append = TRUE )
+```
 
 ### Figure 3-1
 
@@ -1950,16 +2187,6 @@ print(NamedStackedPC)
 
 ```{r plot_orthologue_counts_unnamed, include=TRUE}
 print(UnnamedStackedPC)
-```
-
-```{r loadClusterData}
-# read in cluster data
-clusterFile <- file.path(rootPath, 'dataFiles', 'biolayout.GRCz10.publication_change_with_stage_r-0.94.cluster.info.txt')
-clusterData <- read.table(clusterFile, sep="\t", header=TRUE)
-rownames(clusterData) <- as.character( clusterData$gene_id )
-# get cluster info
-# split clusterData by cluster
-clusters <- split(clusterData, clusterData$cluster)
 ```
 
 ### Figure 3-2
