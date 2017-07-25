@@ -1090,7 +1090,8 @@ profile_for_PC <- function( PCNum, PCDataList, tpms, numGenes = 100, size = 2 ){
 #' @return tpm A numeric matrix normalized by library size and feature length
 #'
 PCA_matrixPlot <- function( PCDataList, pca, ddsRlog, size = 2, 
-                            profile_type = 'heatmap', ... ){
+                            profile_type = 'heatmap', tpms = tpmFilt,
+                            numGenes = 100 ){
   matrixPlotList <- vector( "list", length = length(PCDataList) * length(PCDataList) )
   propVarPC <- pca$sdev^2 / sum( pca$sdev^2 )
   # loop through PCs ( ones above varPCThreshold )
@@ -1101,9 +1102,11 @@ PCA_matrixPlot <- function( PCDataList, pca, ddsRlog, size = 2,
       # else plot firstPC against second PC
       if( firstPC == secondPC ){
         if(profile_type == 'heatmap'){
-          plot <- exprHeatmap( firstPC, PCDataList, ... )
+          plot <- exprHeatmap( firstPC, PCDataList, numGenes = numGenes )
+          plot <- plot + theme( axis.title = element_blank(),
+                                legend.position="none" )
         } else if(profile_type == 'profile'){
-          plot <- profile_for_PC( firstPC, PCDataList, size, ... )
+          plot <- profile_for_PC( firstPC, PCDataList, tpms, numGenes, size )
           plot <- plot + theme( axis.title = element_blank(),
                                 legend.position="none" )
         }
@@ -1129,19 +1132,56 @@ PCA_matrixPlot <- function( PCDataList, pca, ddsRlog, size = 2,
   return(matrixPlotList)
 }
 
+```
+
+```{r pcaMatrixPlot}
 pca <- pcaObj$pca
 PCDataList <- pcaObj$PCData
 matrixPlotList <- PCA_matrixPlot( PCDataList, pca, ddsRlog, 
-                                  tpms = tpmFilt, numGenes = 100, size = 2 )
-
-# save as both pdf and eps
-matrixFile <- file.path(rootPath, 'plots', 'Fig.S2.pdf' )
-ggsave(matrixFile, width = 20, height = 20, marrangeGrob(matrixPlotList, nrow = 6, ncol = 6) )
-
-matrixPlotList <- PCA_matrixPlot( PCDataList, pca, ddsRlog, 
                                   tpms = tpmFilt, numGenes = 100, size = 1 )
-matrixFile <- file.path(rootPath, 'plots', 'Fig.S2.eps' )
-ggsave(matrixFile, width = 7, height = 7, marrangeGrob(matrixPlotList, nrow = 6, ncol = 6), device = 'eps' )
+
+# set max tpm value for heat map colour scale
+heatmap_posns <- as.logical( diag(x = 1, nrow = 6, ncol = 6) )
+maxtpm <- ceiling( max( sapply( matrixPlotList[ heatmap_posns ], function(x){ max(x$data$value) } ) ) )
+for( i in seq_len(length(heatmap_posns))){
+  if( heatmap_posns[i] ){
+    matrixPlotList[[i]] <- matrixPlotList[[i]] + 
+      scale_fill_gradientn( colours = c("blue", "yellow", "red"),
+                            limits = c(0,maxtpm))
+
+  }
+}
+
+# save as eps
+matrixFile <- file.path(rootPath, 'plots', 'Fig.S2-pca_matrix.eps' )
+postscript(matrixFile, width = 7, height = 7, horizontal = FALSE)
+grid.newpage()
+grid.draw( 
+  arrangeGrob( grobs = matrixPlotList,
+               nrow = 6, ncol = 6
+              )
+)
+dev.off()
+
+# plot one heatmap with colour bar 
+postscript(file.path(rootPath, 'plots', 'Fig.S2-heatmap1.eps' ), 
+           width = 7, height = 7, horizontal = FALSE)
+print( matrixPlotList[[1]] + theme( legend.position = 'right' ) )
+dev.off()
+
+# matrix plot with line profiles
+matrixProfilesPlotList <- PCA_matrixPlot( PCDataList, pca, ddsRlog, profile_type = 'profile',
+                                  tpms = tpmFilt, numGenes = 100, size = 1 )
+# save as eps
+matrixFile <- file.path(rootPath, 'plots', 'Fig.S2-pca_matrix.line-profile.eps' )
+postscript(matrixFile, width = 7, height = 7, horizontal = FALSE)
+grid.newpage()
+grid.draw( 
+  arrangeGrob( grobs = matrixProfilesPlotList,
+               nrow = 6, ncol = 6
+              )
+)
+dev.off()
 
 ```
 
