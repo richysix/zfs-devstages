@@ -2340,58 +2340,59 @@ ensBiomart <- useMart(host='jul2016.archive.ensembl.org', biomart = "ENSEMBL_MAR
 #' getGenesForRegion
 #' Function to extract the genes within a genomic range
 #' 
-#' Performs a binomial test given the observed frequency, group size, 
-#'    probability of chosen from the category at random and a category name
+#' Uses the supplied GenesInfo data.frame to get information for all the genes 
+#' within the supplied genomic range
 #'    
 #' @param chr character, name of the chromosome
 #' @param start integer, start of the region (default: 1)
 #' @param end integer, end of the region (default: max position for the chr in the data)
-#' @param AllGenesInfo data.frame, name of the cluster from which the observed counts come
+#' @param GenesInfo data.frame, Genes Info data from with 
+#'        columns chromosome_name, start_position and end_position
 #'
 #' @return data.frame, gene info from Ensembl with geneId, gene name, chr, start and end
 #'
-getGenesForRegion <- function(chr, start = 1, end = NULL, AllGenesInfo){
+getGenesForRegion <- function(chr, start = 1, end = NULL, GenesInfo, sort_by_position = TRUE){
   if( is.null( end ) ){
-    end <- max( AllGenesInfo$end_position[ AllGenesInfo$chromosome_name == chr ] )
+    end <- max( GenesInfo$end_position[ GenesInfo$chromosome_name == chr ] )
   }
-  chr_specific_genes <- AllGenesInfo[ AllGenesInfo$chromosome_name == chr & 
-                                 AllGenesInfo$start_position >= start & 
-                                 AllGenesInfo$end_position <= end, ]
+  chr_specific_genes <- GenesInfo[ GenesInfo$chromosome_name == chr & 
+                                 GenesInfo$start_position >= start & 
+                                 GenesInfo$end_position <= end, ]
+  if( sort_by_position ){
+    chr_specific_genes <- chr_specific_genes[ order(chr_specific_genes$start_position), ]
+  }
   return( chr_specific_genes )
 }
 
-#' getGenesAndPfam
-#' Function to extract the genes within a genomic range and get
-#'    information on PFAM domains
+#' getPfamForGenes
+#' Function to get information on PFAM domains for a list of genes
 #' 
-#' Retrieves PFAM domain information for the genes within the supplied genomic interval 
+#' Retrieves PFAM domain information for the genes in the supplied list
 #'    
 #' @param biomartObj, biomaRt object from connecting to Ensembl bioMart
-#' @param chr character, name of the chromosome
-#' @param start integer, start of the region (default: 1)
-#' @param end integer, end of the region (default: max position for the chr in the data)
+#' @param genes character, list of Ensembl gene ids
 #' @param pfamDesc data.frame, mapping of PFAM accession numbers to descriptions
 #'
 #' @return data.frame, contains information on the genes and the associated PFAM domains
 #'
-getGenesAndPfam <- function( biomartObj, chr, start = 1, end = NULL, pfamDesc ){
-  chr_specific_genes <- getGenesForRegion(chr, start = start, end = end, AllGenesInfo)
+getPfamForGenes <- function( biomartObj, genes, pfamDesc ){
   # get gene/Pfam info from Biomart
   genes_Pfam_domains <- getBM( 
     filters = "ensembl_gene_id",
     attributes = c('ensembl_gene_id', 'external_gene_name', 'pfam'),
-    values = as.character( chr_specific_genes$ensembl_gene_id ),
+    values = as.character( genes ),
     mart = ensBiomart
   )
   # merge to Descriptions and get unqiue rows
   Pfam_plusDesc <- merge(genes_Pfam_domains, pfamDesc)
-  Pfam_plusDesc <-  unique(Pfam_plusDesc[ , 1:4 ])
+  Pfam_plusDesc <-  unique(Pfam_plusDesc[, 1:4 ])
   return(Pfam_plusDesc)
 }
 
-chr4_genes_Pfam <- getGenesAndPfam( ensBiomart, chr4Region$chr, 
-                                    chr4Region$start, chr4Region$end, 
-                                    pfamDesc )
+chr4_specific_gene_info <- getGenesForRegion(chr4Region$chr, chr4Region$start, chr4Region$end, AllGenesInfo)
+chr4_specific_genes <- as.character( chr4_specific_gene_info$ensembl_gene_id )
+
+chr4_genes_Pfam <- getPfamForGenes( ensBiomart, chr4_specific_genes, pfamDesc )
 
 # get zinc finger genes
 chr4_ZnF_genes <- chr4_genes_Pfam[ grepl("[zZ]inc.finger", chr4_genes_Pfam$pfamDescription), ]
