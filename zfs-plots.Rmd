@@ -4483,6 +4483,50 @@ grid.draw(
 dev.off()
 ```
 
+### 3' ends
+
+```{r 3_ends}
+table( mcols(detctDESeqDataSet)[['e86.Ensembl.Gene.ID']] )
+```
+
+```{r compare_overlap_pca_gene_contributions}
+# detct lists are mush smaller
+# see how well they overlap with rnaseq lists
+overlaps <- numeric(length = length(PCDataList))
+for( PCNum in seq_len(length(PCDataList))){
+  rnaseq_gene_list <- rownames(PCDataList[[PCNum]])
+  # build look-up table
+  genes_ids_in_pc <- new.env()
+  for( gene in rnaseq_gene_list ){
+    genes_ids_in_pc[[gene]] <- TRUE
+  }
+  # what fraction of the detct genes exist in the rnaseq list
+  detct_region_list <- rownames(detctPCDataList[[PCNum]])
+  detct_gene_list <- unique(as.character(detctData[ detct_region_list, 'e86.Ensembl.Gene.ID']))
+  
+  num_matching <- sapply(detct_gene_list,
+                          function(gene){ exists(gene, envir = genes_ids_in_pc) }
+                         )
+  overlaps[PCNum] <- sum(num_matching)/length(detct_gene_list)
+}
+
+# PC5 in detct looks more like PC6 from rnaseq
+rnaseq_gene_list <- rownames(PCDataList[[6]])
+genes_ids_in_pc <- new.env()
+for( gene in rnaseq_gene_list ){
+  genes_ids_in_pc[[gene]] <- TRUE
+}
+# what fraction of the detct genes exist in the rnaseq list
+detct_region_list <- rownames(detctPCDataList[[5]])
+detct_gene_list <- unique(as.character(detctData[ detct_region_list, 'e86.Ensembl.Gene.ID']))
+
+num_matching <- sapply(detct_gene_list,
+                       function(gene){ exists(gene, envir = genes_ids_in_pc) }
+)
+sum(num_matching)/length(detct_gene_list)
+
+```
+
 ### Fig.6C
 
 #### Count bar chart by Stage
