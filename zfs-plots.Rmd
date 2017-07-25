@@ -3743,13 +3743,15 @@ for( i in seq_len(length(closeUpPlots)) ){
 }
 ```
 
-```{r produceGeneLists}
+```{r produceGeneLists, eval=FALSE}
 genesPfamList <- lapply( selectedRegions,
-                         function(x){
-                           return( getGenesAndPfam( ensBiomart, x$chr, 
-                                    x$start, x$end, 
-                                    pfamDesc ) )
-                         }
+                         function(x, ensBiomart, pfamDesc){
+                           genes <- as.character( 
+                             getGenesForRegion(x$chr, x$start, x$end, AllGenesInfo)$ensembl_gene_id )
+                         return( getPfamForGenes( ensBiomart, genes, pfamDesc ) )
+                         },
+                         ensBiomart,
+                         pfamDesc
   )
 
 # join to AllGenesInfo
