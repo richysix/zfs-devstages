@@ -1220,7 +1220,7 @@ for (stage in stages){
 ```
 
 ## Figure 3
-### Fig3A
+### Fig3a
 #### Max Stage Clusters TPM heatmap
 
 ```{r cluster_func}
@@ -1327,6 +1327,9 @@ names(GenesPerStage) <- levels(rnaseqSampleInfo$stageName)
 # get tpm data using max mean indices
 tpmByStage <- lapply( seq_len(nlevels(rnaseqSampleInfo$stageName)), getGenesForStage, t(tpmFilt), maxMeanIndices )
 
+```
+
+```{r tpm_by_maxStage_clustered}
 # cluster the genes inside each stage
 tpmByStageClusteredList <- lapply( seq_len(length(tpmByStage)), clusterByGenes, tpmByStage )
 # join back together and transpose
@@ -1620,28 +1623,26 @@ tilePlotDataList <- lapply( seq_len(length(ZFAData.category.p.m.List)),
 tilePlotData <- do.call( rbind, tilePlotDataList )
 
 pvalueCombinedHeatmap <- ggplot( data = tilePlotData ) + 
-  geom_tile( aes( x=Category, y=y, height=height, fill=log10pvalue ),
+  geom_tile( aes( x = Category, y = y, height = height, fill = log10pvalue ),
              colour = "grey70" ) + 
   scale_fill_gradientn( colours = c("red", "orange", "yellow", "white"),
                         guide = guide_colorbar(title = "log10 p-value") ) + 
   theme_void() + theme( legend.title = element_text(colour="black") )
 
 # add to plot list
-plotList <- add_to_plot_list( plotList, 
-                              pvalueCombinedHeatmap, 
-                              file.path(rootPath, 'plots', 'Figure.3a-zfa-heatmap.pdf') )
-
+pdf( file.path(rootPath, 'plots', 'Figure.3-1.zfa-heatmap.pdf') )
 print(pvalueCombinedHeatmap)
+dev.off()
 ```
 
 ```{r goEnrichment, eval=FALSE}
 # do Go enrichment on genes assigned to each stage by max mean expression
 
-# function to return sig genes by 'pvalue'
-sigLevel <- 0.05
-topDiffGenes <- function(allScore) {
-  return(allScore < sigLevel)
-}
+# # function to return sig genes by 'pvalue'
+# sigLevel <- 0.05
+# topDiffGenes <- function(allScore) {
+#   return(allScore < sigLevel)
+# }
 
 code2ontology <- list(
   "BP" = 'biological_process',
@@ -1674,57 +1675,71 @@ for( ontology in c('BP', 'CC', 'MF') ){
 #' @param ontologyClass character, one of 'BP', 'MF' or 'CC'
 #' @param allGenes character, named vector of the complete set of genes to compare to
 #'
-#' @return Heatmap ggplot2 object
+#' @return
 #'
-runTopGO <- function( stageIndex, countsList, ontologyClass, allGenes ){
-  stageSubset <- countsList[[stageIndex]]
-  stageName <- levels(rnaseqSampleInfo$stageName)[stageIndex]
-  stageName <- gsub("%", "pc", stageName)
-  # get sig genes from subset
-  sigGenes <- rep(0.95, length(allGenes))
+# runTopGO <- function( stageIndex, countsList, ontologyClass, allGenes, sigLevel = 0.05 ){
+runTopGO <- function( gene_list, ontologyClass, allGenes, outputPrefix = 'topGO', sigLevel = 0.05 ){
+  # construct a factor for the sig genes
+  sigGenes <- rep(0, length(allGenes))
   names(sigGenes) <- allGenes
-  sigGenes[ colnames(stageSubset) ] <- 0.01
-
+  sigGenes[ gene_list ] <- 1
+  sigGenes <- factor(sigGenes)
   
   # Make topGOdata object
   # nodeSize=10 : prune GO hierarchy of terms associated with < 10 genes
   GOdata <- new("topGOdata", ontology=ontologyClass, allGenes=sigGenes,
-                geneSel=topDiffGenes, annot=annFUN.gene2GO, 
-                gene2GO=id2GOList[[ontologyClass]], nodeSize=10)
-  
+                    annot=annFUN.gene2GO, 
+                    gene2GO=id2GOList[[ontologyClass]], nodeSize=10)
   # Run topGO
-  resultKS.elim <- runTest(GOdata, algorithm="elim", statistic="ks")
-  nodecount <- length(score(resultKS.elim))
-  allRes <- GenTable(GOdata, elimKS=resultKS.elim, topNodes=nodecount)
+  # result <- runTest(GOdata, algorithm="elim", statistic="ks")
+  result <- runTest(GOdata, algorithm="weight01", statistic="fisher")
+  nodecount <- length(score(result))
+  allRes <- GenTable(GOdata, pvalue=result, topNodes=nodecount)
   # Horrible way to get all the genes associated with each term
   allRes$Genes <- sapply(allRes$GO.ID,
                          function(x) gsub('[c()" \n]', '', genesInTerm(GOdata, x)))
-  sigRes <- allRes[suppressWarnings(as.numeric(allRes$elimKS)) < sigLevel,]
+  allRes$pvalue[ allRes$pvalue == '< 1e-30' ] <- 1e-30
   
-  outputPrefix <- file.path( 
-    'topgo',
-    'maxByStage',
-    paste(stageName, ontologyClass, sep='.')
-  )
-  write.table( allRes, file=paste0(outputPrefix, ".topGO.tsv"), quote=FALSE,
+  sigRes <- allRes[suppressWarnings(as.numeric(allRes$pvalue)) < sigLevel,]
+  
+  write.table( allRes, file=paste0(outputPrefix, ".tsv"), quote=FALSE,
                row.names=FALSE, sep="\t" )
   
   # Write PDF
-  pdf(paste0(outputPrefix, ".topGO.pdf"))
-  try(suppressWarnings(showSigOfNodes(GOdata, score(resultKS.elim),
+  pdf(paste0(outputPrefix, ".pdf"))
+  try(suppressWarnings(showSigOfNodes(GOdata, score(result),
                                       firstSigNodes=5, useInfo="all")), silent=TRUE)
-  try(suppressWarnings(showSigOfNodes(GOdata, score(resultKS.elim),
+  try(suppressWarnings(showSigOfNodes(GOdata, score(result),
                                       firstSigNodes=10, useInfo="all")), silent=TRUE)
-  try(suppressWarnings(showSigOfNodes(GOdata, score(resultKS.elim),
+  try(suppressWarnings(showSigOfNodes(GOdata, score(result),
                                       firstSigNodes=nrow(sigRes), useInfo="all")), silent=TRUE)
   try(suppressWarnings(lapply(sigRes[,1],
                               function(x) showGroupDensity(GOdata, x))), silent=TRUE)
   dev.off()
+  
+  return(sigRes)
 }
+```
 
+```{r run_GO, include=TRUE}
 allGenes <- do.call(c, lapply(tpmByStage, function(x){ colnames(x) } ) )
 for( ontologyClass in c('BP', 'MF', 'CC') ){
-  lapply(seq_len(length(tpmByStage)), runTopGO, tpmByStage, ontologyClass, allGenes )
+  lapply(seq_len(length(tpmByStage)), 
+         function(stageIndex, tpmByStage, ontologyClass, allGenes, sigLevel){
+           stageSubset <- tpmByStage[[stageIndex]]
+           stageName <- levels(rnaseqSampleInfo$stageName)[stageIndex]
+           stageName <- gsub("%", "pc", stageName)
+           outputPrefix <- file.path( 
+             'output',
+             'topgo',
+             'maxByStage',
+             paste(stageName, ontologyClass, 'topGO', sep='.')
+           )
+           gene_list <- colnames(stageSubset)
+           runTopGO( gene_list, ontologyClass, allGenes, outputPrefix , sigLevel )
+         },
+         tpmByStage, ontologyClass, allGenes, 0.05
+       )
 }
 
 #' outputStageGenes
@@ -1737,7 +1752,7 @@ for( ontologyClass in c('BP', 'MF', 'CC') ){
 #' @param countsList list, list of count matrices split by stage
 #' @param allGenes character, named vector of the complete set of genes to compare to
 #'
-#' @return Heatmap ggplot2 object
+#' @return 
 #'
 outputStageGenes <- function( stageIndex, countsList, allGenes ){
   stageSubset <- countsList[[stageIndex]]
@@ -1759,7 +1774,8 @@ outputStageGenes <- function( stageIndex, countsList, allGenes ){
   geneInfo <- geneInfo[ , c(2,1) ]
   
   outputPrefix <- file.path(
-    rootPath, 
+    rootPath,
+    'output',
     'topgo',
     'maxByStage',
     stageName
