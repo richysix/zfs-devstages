@@ -2629,11 +2629,11 @@ plotExprByChr <- function( chr, start = 1, end = NULL, position = TRUE, tpm = tp
   }
     
   chr_specific_tpmsUnclusteredPlot <- chr_specific_tpmsUnclusteredPlot +
-    theme( axis.text.y = element_text(colour="black"),
+    theme( axis.text.y = element_text(colour="black", angle = 0, debug = FALSE),
           axis.ticks.y = element_line( colour="black"),
           legend.position="left",
-          legend.title = element_text(colour="black" ),
-          plot.title = element_text(colour="black" ) ) + 
+          legend.title = element_text(colour="black", angle = 0, debug = FALSE),
+          plot.title = element_text(colour="black", angle = 0, debug = FALSE) ) + 
     labs(title = chr_string) + 
     guides( fill = guide_colorbar(title = "log10\nTPM") )
   return( 
