@@ -549,7 +549,7 @@ genesDistPlot <- ggplot(data=meanTpmFiltByStage, aes(meanExpr) ) +
     return(log2labels)
   } )
 
-print(genesDistPlot)
+# print(genesDistPlot)
 ```
 
 ```{r tpm_dist_hist}
@@ -687,9 +687,10 @@ dev.off()
 
 ```
 
-### Fig 1c-d
+### Fig 1d
 
 ```{r pca}
+# set up constants
 varPCThreshold <- 1
 varRegionThreshold <- 0.01
 sampleNames <- FALSE
@@ -879,13 +880,13 @@ op <- par3d()
 par3d( windowRect = c(0,0,620,512) )
 rgl.viewpoint( theta = 30, phi = 5, zoom = 0.75 )
 
-rgl.postscript( filename = file.path(rootPath, 'plots', 'Figure.1e.eps'), 
+rgl.postscript( filename = file.path(rootPath, 'plots', 'Figure.1d.eps'), 
                 fmt = 'eps', drawText = TRUE 
 )
-rgl.postscript( filename = file.path(rootPath, 'plots', 'Figure.1e.notext.eps'), 
+rgl.postscript( filename = file.path(rootPath, 'plots', 'Figure.1d.notext.eps'), 
                 fmt = 'eps', drawText = FALSE 
 )
-rgl.snapshot( filename = file.path(rootPath, 'plots', 'Figure.1e.png'), 
+rgl.snapshot( filename = file.path(rootPath, 'plots', 'Figure.1d.png'), 
               fmt = "png")
 par3d(op)
 ```
