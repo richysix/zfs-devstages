@@ -3799,13 +3799,13 @@ paraloguesData <- read.table(paraloguesFile, sep="\t",
 
 ```{r correlation, include=TRUE}
 # use tpms
-data <- tpmFilt
+expr_data <- tpmFilt
 # # or normalised counts
-# data <- counts(dds, normalized = TRUE )
-# rownames(data) <- mcols(dds)[ , geneIdColumnName ]
+# expr_data <- counts(dds, normalized = TRUE )
+# rownames(expr_data) <- mcols(dds)[ , geneIdColumnName ]
 # # remove rows that are all zeros
-data <- data[ rowSums(data) > 0, ]
-geneCor <- cor(t(data))
+expr_data <- expr_data[ rowSums(expr_data) > 0, ]
+geneCor <- cor(t(expr_data))
 
 # for each combination of genes get the correlation coefficient
 pairwiseCorList <- lapply( seq_len(nrow(paraloguesData)),
@@ -3833,7 +3833,7 @@ pairwiseCor <- pairwiseCor[!is.na(pairwiseCor$CorCoeff),]
 pairwiseCor$type <- rep('paralogue_pairs', nrow(pairwiseCor))
 ```
 
-```{r addGeneNames, eval=FALSE}
+```{r addGeneNames}
 # get gene names and add to pairwiseCor
 pairwiseCor$gene1Name <- geneNames[ as.character(pairwiseCor$gene1) ]
 pairwiseCor$gene2Name <- geneNames[ as.character(pairwiseCor$gene2) ]
@@ -3916,7 +3916,7 @@ plotLog10Heatmap <- function( genes ){
 #'
 #' @return data.frame
 #'
-getExprData <- function( genes, log = FALSE, scale = TRUE ){
+getExprData <- function( genes, log = FALSE, scale = TRUE, tpm = tpmFilt ){
   exprMatrix <- as.matrix( tpm[ as.character( unlist(genes[1,1:2]) ), 1:90 ] )
   rownames(exprMatrix) <- as.character( unlist(genes[1,1:2]) )
   if( scale ){
@@ -4000,7 +4000,7 @@ highlyCor <- pairwiseCor[ pairwiseCor$CorCoeff > corThreshold & !is.na(pairwiseC
 highlyCor <- highlyCor[ order(highlyCor$CorCoeff, decreasing = TRUE), ]
 
 corThreshold <- -0.5
-negCor <- pairwiseCor[ pairwiseCor$CorCoeff < corThreshold & !is.na(pairwiseCor$CorCoeff), ]
+genes <- pairwiseCor[ pairwiseCor$CorCoeff < corThreshold & !is.na(pairwiseCor$CorCoeff), ]
 negCor <- negCor[ order(negCor$CorCoeff), ]
 
 top10_bottom10 <- rbind( highlyCor[1:10,], negCor[1:10,] )
@@ -4031,14 +4031,19 @@ top10_bottom10ExprData$Var2 <- factor( top10_bottom10ExprData$Var2,
                                        levels = levels(genesCor$geneIds) )
  
 top10_bottom10Heatmap <- ggplot(data = top10_bottom10ExprData) + 
-    geom_raster( aes( y = Var2, x = stageName, fill = value ) ) + 
+    geom_raster( aes( y = Var2, x = Var1, fill = value ) ) + 
     scale_y_discrete( labels = genesCor$geneNames ) + 
-    scale_fill_gradientn( colours = c("blue", "yellow", "red") ) + 
+    scale_fill_gradientn( colours = c("blue", "yellow", "red"),
+                          guide = guide_colourbar(title = expression(paste(log[10], '(TPM)')) ) ) + 
     theme_void() + theme( legend.position="bottom",
-                          legend.title = element_text(colour="black", angle = 0, debug = FALSE),
-                          axis.text.y = element_text(colour="black", angle = 0, debug = FALSE, size = 6) )
+                          legend.title = element_text(colour="black", size = 7, 
+                                                      angle = 0, debug = FALSE),
+                          legend.text = element_text(colour="black", size = 6, 
+                                                      angle = 0, debug = FALSE),
+                          axis.text.y = element_text(face = 'italic', colour="black", 
+                                                     angle = 0, debug = FALSE, size = 6) )
 postscript(file = file.path(rootPath, 'plots', 'Fig.6b.eps'),
-           width = 3, height = 4.5, paper = 'special', horizontal = FALSE)
+           width = 3.5, height = 4, paper = 'special', horizontal = FALSE)
 print(top10_bottom10Heatmap)
 dev.off()
 ```
@@ -4053,7 +4058,7 @@ ckm_plot <- plotExprByStage( ckm_genes,
 ckm_plot <- ckm_plot + theme( plot.title = element_blank(),
                               axis.text = element_text(colour="black", angle = 0, debug = FALSE, size = 6),
                               axis.title = element_text(colour="black", angle = 0, debug = FALSE, size = 7),
-                              legend.text = element_text(colour="black", angle = 0, debug = FALSE, size = 6),
+                              legend.text = element_text(face = 'italic', colour="black", angle = 0, debug = FALSE, size = 6),
                               legend.title = element_text(colour="black", angle = 0, debug = FALSE, size = 7)
                               )
 
@@ -4069,7 +4074,7 @@ ckm_scatterplot <- make_scatterplot( ckm_genes )
 
 ckm_scatterplot <- ckm_scatterplot + 
   theme( plot.title = element_blank(),
-         axis.text = element_text(colour="black", angle = 0, debug = FALSE, size = 12),
+         axis.text = element_text(face = 'italic', colour="black", angle = 0, debug = FALSE, size = 12),
          axis.title = element_text(colour="black", angle = 0, debug = FALSE, size = 14),
          legend.text = element_text(colour="black", angle = 0, debug = FALSE, size = 12),
          legend.title = element_text(colour="black", angle = 0, debug = FALSE, size = 14)
@@ -4090,7 +4095,7 @@ impdh1_plot <- plotExprByStage( impdh1_genes,
 impdh1_plot <- impdh1_plot + theme( plot.title = element_blank(),
                               axis.text = element_text(colour="black", angle = 0, debug = FALSE, size = 6),
                               axis.title = element_text(colour="black", angle = 0, debug = FALSE, size = 7),
-                              legend.text = element_text(colour="black", angle = 0, debug = FALSE, size = 6),
+                              legend.text = element_text(face = 'italic', colour="black", angle = 0, debug = FALSE, size = 6),
                               legend.title = element_text(colour="black", angle = 0, debug = FALSE, size = 7)
                               )
 
@@ -4107,7 +4112,7 @@ impdh1_scatterplot <- make_scatterplot( impdh1_genes )
 
 impdh1_scatterplot <- impdh1_scatterplot + 
   theme( plot.title = element_blank(),
-         axis.text = element_text(colour="black", angle = 0, debug = FALSE, size = 12),
+         axis.text = element_text(face = 'italic', colour="black", angle = 0, debug = FALSE, size = 12),
          axis.title = element_text(colour="black", angle = 0, debug = FALSE, size = 14),
          legend.text = element_text(colour="black", angle = 0, debug = FALSE, size = 12),
          legend.title = element_text(colour="black", angle = 0, debug = FALSE, size = 14)
