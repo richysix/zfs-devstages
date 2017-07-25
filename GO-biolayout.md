@@ -22,43 +22,45 @@ done
 topGO was run using a custom R script (topGO-biolayout-clusters.R). The clusterName option to the script runs the gene enrichment on the specified cluster. Otherwise it runs it on each cluster sequentially.
 e.g.
 ```bash
-mkdir topgo/0.94-e85/
+mkdir topgo/0.94-e85-fisher/
 # single cluster
-Rscript topGO-biolayout-clusters.R \
---directory=topgo --OutputDirectory=0.94-e85 --clusterName=Cluster001 \
-dataFiles/biolayout.GRCz10.publication_change_with_stage_r-0.94.cluster.info.txt
-
-# or run all together
-Rscript topGO-biolayout-clusters.R \
---directory=topgo --OutputDirectory=0.94-e85 \
-dataFiles/biolayout.GRCz10.publication_change_with_stage_r-0.94.cluster.info.txt
+Rscript topGO-multiple-clusters.R \
+--directory=output \
+--outputDirectory=topgo/0.94-e85-fisher/ --clusterName=Cluster001 --clusterNameColumn=cluster \
+--ontology=All --significanceLevel=0.05 --mtc=Bonferroni --test fisher \
+--minClusterSize=6 --enrichmentOnly --ensembl_version=85 \
+dataFiles/zfs-grcz10.tpm_r-0.94_pearson.cluster.info.txt
 ```
+
 
 ## Pull out significantly enriched genes
 
 A perl script was used to select which GO terms were enriched in which clusters.
 
 ```bash
-dir='topgo/0.94-e85'
-adjustedP=$(echo "0.05/252" | bc -l | sed -e 's|^|0|')
-for cluster in $( seq -w 1 252 | sed -e 's|^|Cluster|' )
+dir='output/topgo/0.94-e85-fisher'
+adjustedP=$(echo "0.05/254" | bc -l | sed -e 's|^|0|')
+for cluster in $( seq -w 1 254 | sed -e 's|^|Cluster|' )
 do
-grep $cluster dataFiles/biolayout.GRCz10.publication_change_with_stage_r-0.94.cluster.info.txt \
+grep $cluster dataFiles/zfs-grcz10.tpm_r-0.94_pearson.cluster.info.txt \
 > $dir/$cluster.gene-list.tsv
 for ontology in BP MF CC
 do
 perl parse_GO_results.pl \
---enriched --output_file $dir/$cluster.GO.$ontology.sig.tsv \
+--enriched --sig_level $adjustedP \
+--fold_enrichment 1.3 --min_genes 5 \
+--output_file $dir/$cluster.GO.$ontology.sig.tsv \
 $dir/$cluster.GO.$ontology.all.tsv \
 $dir/$cluster.gene-list.tsv > $dir/$cluster.GO.$ontology.enriched.sig.tsv
 done
 done
 ```
 
+
 join cluster results together
 ```bash
-dir='topgo/0.94-e85'
-for cluster in $( seq -w 1 252 | sed -e 's|^|Cluster|' )
+dir='output/topgo/0.94-e85-fisher'
+for cluster in $( seq -w 1 254 | sed -e 's|^|Cluster|' )
 do
 for ontology in BP MF CC
 do
@@ -71,5 +73,11 @@ sed -E "s|^|$cluster;$domain;|" $dir/$cluster.GO.$ontology.enriched.sig.tsv | \
 tr ';' '\t' | sort -t$'\t' -k8,8nr
 done
 done | perl -F"\t" -lane 'BEGIN{ print join("\t", qw{Cluster GOTermID Description Domain AdjustedpValue Expected Observed log2FoldEnrichment})}
-{print join("\t", @F[0,2,3,1,4..7]); }' > $dir/topgo-0.94-sigResults.tsv
+{print join("\t", @F[0,2,3,1,4..7]); }' > $dir/topGOResults.sig.tsv
+```
+
+Create html file to summarise GO and ZFA enrichments for browsing (see zfa-enrichment.md for details on ZFA enrichment)
+
+```bash
+Rscript make_go_zfa_summary.R
 ```
