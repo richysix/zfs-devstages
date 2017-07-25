@@ -39,7 +39,9 @@ for( dir in c('plots', 'output',
               file.path('output', 'topgo'),
               file.path('output', 'topgo', 'maxByStage'),
               file.path('output', 'topgo', '0.94-e85'),
-              file.path('output', 'biolayout-clusters-files') ) ){
+              file.path('output', 'topgo', 'cor-genes'),
+              file.path('output', 'topgo', 'mult-ends'),
+              file.path('output', 'chr_expression_domains') ) ){
   dirPath <- file.path( rootPath, dir )
   if( !dir.exists(dirPath) ){
     dir.create( dirPath )
@@ -3364,12 +3366,25 @@ genome(GRCz10Chrs) <- 'GRCz10'
 # sort tpm by Chr and by Start
 tpmChrSorted <- tpmAnno[ order(tpmAnno$Chr, tpmAnno$Start), ]
 
+# make data frame from normalized counts
+norm_counts_chr_sorted_counts <- counts(dds, normalized = TRUE)[ order(mcols(dds)$Chr, mcols(dds)$Start), ]
+norm_counts_chr_sorted_anno <- as.data.frame(mcols(dds)[ order(mcols(dds)$Chr, mcols(dds)$Start), ])
+norm_counts_chr_sorted <- cbind(norm_counts_chr_sorted_anno, norm_counts_chr_sorted_counts)
+
 # make GRanges object
+# GenesGR <- GRanges(
+#   seqnames = Rle(tpmChrSorted$Chr),
+#   ranges = IRanges(start = tpmChrSorted$Start, end = tpmChrSorted$End),
+#   strand = Rle(tpmChrSorted$Strand),
+#   GeneId = rownames(tpmChrSorted)
+# )
+
 GenesGR <- GRanges(
-  seqnames = Rle(tpmChrSorted$Chr),
-  ranges = IRanges(start = tpmChrSorted$Start, end = tpmChrSorted$End),
-  strand = Rle(tpmChrSorted$Strand),
-  GeneId = rownames(tpmChrSorted)
+  seqnames = Rle(norm_counts_chr_sorted_anno$Chr),
+  ranges = IRanges(start = norm_counts_chr_sorted_anno$Start, 
+                    end = norm_counts_chr_sorted_anno$End),
+  strand = Rle(norm_counts_chr_sorted_anno$Strand),
+  GeneId = rownames(norm_counts_chr_sorted_anno)
 )
 
 # function to calculate average pair-wise correlation
@@ -3390,7 +3405,7 @@ average_pairwise_sim <- function(index, gr, sim, chr, start_indices, end_indices
       start = start(gr)[start_index], 
       end = end(gr)[end_index],
       strand = '+',
-      avSim = mean(cor_coeffs)
+      avSim = mean(cor_coeffs, na.rm = TRUE)
     )
   )
 }
@@ -3403,7 +3418,7 @@ avSimbyChr <- vector('list', length = 25 )
 names(avSimbyChr) <- names(GenesGRbyChr)[1:25]
 for( chr in names(GenesGRbyChr)[1:25] ){
   gr <- GenesGRbyChr[[chr]]
-  data <-  tpmChrSorted[ tpmChrSorted$Chr == chr, ]
+  data <-  norm_counts_chr_sorted[ norm_counts_chr_sorted$Chr == chr, ]
   sim <- cor(t(data[ , 9:98 ]))
   start_indices <- seq_len(length(gr)+1-windowSize)
   end_indices <- start_indices + windowSize - 1
@@ -3419,6 +3434,8 @@ for( chr in names(GenesGRbyChr)[1:25] ){
     strand = Rle(avSim$strand),
     seqinfo = GRCz10Chrs,
     avSim = avSim$avSim,
+    start_index = start_indices,
+    end_index = end_indices,
     mid_point = start_indices + (end_indices - start_indices) / 2
   )
 }
@@ -3460,14 +3477,14 @@ names(chrSpecificGeneExprList) <- as.character(1:25)
 
 # print without y axis labels and legend
 # remove the position labels and unify colour scale across chrs
-maxtpm <- log10( max( sapply(chrSpecificGeneExprList, function(x){ max( x$tpms ) } ) ) )
+maxtpm <- log10( max( sapply(chrSpecificGeneExprList, function(x){ max( x$tpms, na.rm = TRUE ) } ), na.rm = TRUE ) )
 
 # plot chr heatmap and similarity measure together
 chrSpecificGeneExprPlotNoLegendList <- vector('list', length = 25)
 names(chrSpecificGeneExprPlotNoLegendList) <- as.character(1:25)
 scaled_threshold <- -100 + simThreshold * 100
 for( chr in as.character(1:25) ){
-  cat( sprintf('Chr %d', chr) )
+  cat( sprintf('Chr %s', chr) )
   plot_data <- as.data.frame(mcols(avSimGRL[[chr]]))
   plot_data$score_scaled <- -100 + plot_data$avSim * 100
   chrSpecificGeneExprPlotNoLegendList[[chr]] <-
@@ -3482,12 +3499,16 @@ for( chr in as.character(1:25) ){
   print(chrSpecificGeneExprPlotNoLegendList[[chr]])
 }
 
+pdf(file = file.path(rootPath, 'plots', 'chr_ordered_tpm_heatmaps.pdf'))
+print(chrSpecificGeneExprPlotNoLegendList)
+dev.off()
+
 # resize each plot based on the number of genes for that chromosome 
 heights <- sapply( chrSpecificGeneExprList, function(x){ nrow( x$tpms) } )
 plotHeights <- heights/max(heights)
 
 for( i in seq_len(length(chrSpecificGeneExprPlotNoLegendList)) ){
-  postscript(file=file.path(rootPath, 'plots', paste0('Figure.4-3.chr', i, '.chr-order.eps') ),
+  postscript(file=file.path(rootPath, 'plots', paste0('Figure.4b.chr', i, '.chr-order.eps') ),
       width=1.5,height=24*plotHeights[i], paper = "special")
   print(chrSpecificGeneExprPlotNoLegendList[[i]])
   dev.off()
@@ -3496,35 +3517,41 @@ for( i in seq_len(length(chrSpecificGeneExprPlotNoLegendList)) ){
 }
 
 # print one with a legend to get the legend
-postscript(file=file.path(rootPath, 'plots', paste0('Figure.4-3.chr1.chr-order.pluslegend.eps') ))
+postscript(file=file.path(rootPath, 'plots', paste0('Figure.4b.chr1.chr-order.pluslegend.eps') ))
 chrSpecificGeneExprList[[1]]$plot + 
   scale_fill_gradientn( limits = c(0,maxtpm),
   colours = c("blue", "yellow", "red") )
 dev.off()
+
 ```
 
 ### Get Peaks
 
 ```{r collect_hits, include=TRUE}
-findHits <- function( chr, tpmChrSorted, chrSimList, windowSize, simThreshold ){
+findHits <- function( chr, avSimGRL, windowSize, simThreshold ){
   # cat(sprintf('Chr: %s\n', chr))
   # get plot Data
-  plotData <- chrSimList[[chr]]
-  data <-  tpmChrSorted[ tpmChrSorted$Chr == chr, ]
+  data <- avSimGRL[[chr]]
   # go through and aggregate runs that exceed the threshold
   prevAboveThreshold <- FALSE
   runsList <- vector( 'list' )
   runsListIndex <- 1
   runStart <- 0
   i <- 1
-  for( aboveThreshold in plotData$avSim >= simThreshold ){
+  for( aboveThreshold in data$avSim >= simThreshold ){
+    if( is.na(aboveThreshold) ){
+      aboveThreshold <- FALSE
+    }
+    if( is.na(prevAboveThreshold) ){
+      prevAboveThreshold <- FALSE
+    }
+    
     if( !prevAboveThreshold & !aboveThreshold ){
       # between runs, carry on
     } else if( prevAboveThreshold & !aboveThreshold ){
       # end of a run
-      dataSubset <- data[ runStart:(i+windowSize-1), ]
-      runsList[[ runsListIndex ]] <- dataSubset
-      # cat( dim(dataSubset), "\n" )
+      # cat(sprintf('run start: %d, i: %d\n', runStart, (i-1) ))
+      runsList[[ runsListIndex ]] <- data[ runStart:(i-1), ]
       runsListIndex <- runsListIndex + 1
     } else if( !prevAboveThreshold & aboveThreshold ){
       # start of a new run
@@ -3551,12 +3578,14 @@ findHits <- function( chr, tpmChrSorted, chrSimList, windowSize, simThreshold ){
       # cat('i:', i, "\n")
       next_region <- runsList[[i]]
       # compare the current region to the next one
-      if ( next_region$Start[1] <= current_region$End[nrow(current_region)] ) {
+      if ( start(next_region)[1] <= end(current_region)[length(current_region)] ) {
         # if they overlap merge them, set current region to the merged region
         overlap <- TRUE
-        current_region <- 
-          rbind( current_region,
-                 next_region[ setdiff(rownames(next_region), rownames(current_region)), ] )
+        # combine ranges
+        current_region <- c(current_region, next_region)
+        # make sure range contains sim measures for all windows in that window
+        current_region <- data[ mcols(data)$start_index >= mcols(current_region)$start_index[1] & 
+                                  mcols(data)$end_index <= mcols(current_region)$end_index[length(current_region)], ]
         i <- i + 1
       } else {
         # if they don't, add the current region to the list and set the next region to be the new current region
@@ -3582,44 +3611,102 @@ findHits <- function( chr, tpmChrSorted, chrSimList, windowSize, simThreshold ){
   }
 }
 
-plotSubset <- function( dataSubset, chr ){
-  exprMatrix <- as.matrix(log10(dataSubset[,8:97]+1))
+plotSubset <- function( dataSubset, region, rowLabels ){
+  exprMatrix <- as.matrix(log10(dataSubset+1))
   # reverse rows of matrix
   exprMatrix <- exprMatrix[seq(nrow(exprMatrix),1,-1), ]
-  rowLabels <- rev(as.character(dataSubset$GeneName))
+  rowLabels <- rev(as.character(rowLabels))
 
   # put chr and region on plot
-  title_text <- paste0('Chr ', chr, ' (', dataSubset$Start[1], '-', dataSubset$End[length(dataSubset$End)], ')')
-  heatmap <- ggplotExprHeatmap( exprMatrix, rowLabels = rowLabels ) +
-              labs(title = title_text ) + 
+  heatmap <- rnaseqVis::ggplotExprHeatmap( exprMatrix, rowLabels = rowLabels ) +
+              labs(title = region ) + 
               theme( axis.text.y = element_text( colour = "black", angle = 0, debug = FALSE),
                      plot.title = element_text( colour = "black", angle = 0, debug = FALSE) )
   return(heatmap)
 }
 
-outputResults <- function(chr, peaksList){
+outputResults <- function(chr, peaksList, ensBiomart, pfamDesc){
   # cat(chr, "\n")
+  # # get AllGenesInfo subsetted to the genes in tpmFilt/tpmAnno
+  # GenesInfo <- AllGenesInfo[rownames(tpmAnno), ]
+  # GenesInfo <- GenesInfo[ order(GenesInfo$chromosome_name, GenesInfo$start_position), ]
+  
   dataList <- peaksList[[chr]]
-  plotList <- lapply(dataList, plotSubset, chr)
+  plotList <- vector('list', length = length(dataList) )
   for( peakNum in seq_len(length(dataList))){
-     file <- file.path(outputDir, paste0('chr', chr, '-peak', peakNum, '.tsv') )
-     write.table(dataList[[peakNum]][,1:7], file=file, sep="\t", row.names = TRUE, col.names = TRUE, quote = FALSE)
+    range <- dataList[[peakNum]]
+    genes_info <- getGenesForRegion(
+          as.character(runValue(seqnames(range))[1]),
+          start(range)[1], 
+          end(range)[length(range)], 
+          AllGenesInfo)
+    genes <- as.character(genes_info$ensembl_gene_id)
+    tpmMat <- tpmAll[genes, ]
+    
+    if( sum(rowSums(tpmMat) > 0 & !is.na(tpmMat[,1])) >= 10 ){
+      genes <- genes[ !is.na(tpmMat[,1]) ]
+      gene_name_labels <- norm_counts_chr_sorted[genes, 'Gene.name']
+      tpmMat <- tpmMat[genes, ]
+      
+      region <- paste0('Chr', chr, '-', start(dataList[[peakNum]])[1], 
+             '-', end(dataList[[peakNum]])[length(dataList[[peakNum]])])
+      plotList[[peakNum]] <- plotSubset(tpmMat, region, gene_name_labels)
+      
+      # # get pfam info for genes in region
+      pfam_info <- getPfamForGenes( ensBiomart, genes, pfamDesc )
+      genes_info <- merge(genes_info, pfam_info)
+      genes_info <- genes_info[ order(genes_info$start_position), ]
+
+      file <- file.path('output', 'chr_expression_domains', paste0(region, '.tsv') )
+      write.table(genes_info, file=file, sep="\t",
+                 row.names = FALSE, col.names = TRUE, quote = FALSE)
+    } else{
+      region <- paste0('Chr', chr, '-', start(dataList[[peakNum]])[1], 
+             '-', end(dataList[[peakNum]])[length(dataList[[peakNum]])])
+      cat(region, "\n")
+    }
   }
   return( plotList )
 }
 
 # simThreshold is defined in block `plot_similarity`
 windowSize <- 10
-peaksList <- lapply( seq_len(25), findHits, 
-                     tpmChrSorted, chrSimList, 
-                     windowSize, simThreshold )
+peaksList <- lapply( as.character(seq_len(25)), findHits, 
+                     avSimGRL, windowSize, simThreshold )
 
-plots <- lapply( seq_len(25), outputResults, peaksList )
-plots
+plots <- lapply( seq_len(25), outputResults, peaksList, ensBiomart, pfamDesc )
+
+pdf(file = file.path('plots', 'chr_expression_domains.pdf'))
+print(plots)
+dev.off()
+
+for( i in seq_len(length(plots)) ){
+  plot_list <- plots[[i]]
+  for( j in seq_len(length(plot_list)) ){
+    plot <- plot_list[[j]]
+    pdf(file = file.path('plots', paste0('chr_expression_domains.chr', i, '.', j, '.eps')) )
+    print(plot)
+    dev.off()
+  }
+}
 
 ```
 
-```{r fig.4.3b-g, include=TRUE}
+```{bash}
+# concat region files together with region
+# header
+find output/chr_expression_domains | grep tsv$ | head -n1 | \
+xargs grep ^ensembl_gene_id | sed -E "s|^|Region"$'\t'"|" > output/chr_expression_domains/chr_ex_domains.tsv
+# cat genes and add PFAM
+for region in $(find output/chr_expression_domains | grep 'Chr.*tsv$' | sed -e 's|^.*/||; s|\.tsv||;' | sort -k1.4,1.5n -k1.6,1.13n )
+do 
+cat output/chr_expression_domains/$region.tsv | grep -v ^ensembl_gene_id | \
+perl -F"\t" -lane '$region = "'$region'"; $region =~ s|-|:|; ; print join("\t", $region, @F);'
+done >> output/chr_expression_domains/chr_ex_domains.tsv
+
+```
+
+```{r fig.4.3b-g, include=TRUE, eval=FALSE}
 selectedRegions <- list(
   crystallins = list( chr = "9", start = 22082881, end = 22866634 ),
   cathepsins = list( chr = "12", start = 16470000, end = 16800000 ),
