@@ -2311,18 +2311,21 @@ if [[ ! -e $pfamMappingFile ]]
 then
   # download from EBI
   curl -O $pfamFTPLink
+  mv $pfamMappingFile dataFiles/$pfamMappingFile
 fi
 ```
 
 ```{r getPFAMdomains}
 # get Pfam ID to Description
-pfamMappingFile <- file.path( rootPath, 'pdb_pfam_mapping.txt')
+pfamMappingFile <- file.path(rootPath, 'dataFiles', 'pdb_pfam_mapping.txt')
 pfamMapping <- read.table(file=pfamMappingFile, sep="\t", header=TRUE)
 # make named vector of IDs to Description
 pfamDesc <- data.frame(
   pfam = gsub("\\.[0-9]+", "", pfamMapping$PFAM_ACC ),
   pfamDescription = pfamMapping$PFAM_desc
 )
+# limit to unique rows
+pfamDesc <- unique(pfamDesc)
 ```
 
 ```{r get_chr4_genes}
