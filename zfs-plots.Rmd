@@ -2583,79 +2583,6 @@ cluster_and_plot_tpms <- function( tpms, rows = NULL, columns = 1:90, cluster = 
 }
 ```
 
-```{r set_colour_palette}
-colPalette <- c(
-  "Cluster001" = "#F3756D", 
-  "Cluster002" = "#D69029", 
-  "Cluster003" = "#36AAE1",
-  "Cluster004" = "#94A3BE",
-  "Cluster005" = "#16BCC2",
-  "Cluster006" = "#8D8CC4",
-  "Cluster009" = "#ED66A6",
-  "Cluster022" = "#5EBB47",
-  "Cluster037" = "#97543B",
-  "Cluster084" = "#363A4D"
-)
-```
-
-```{r znf_log10TPM_heatmap, include=TRUE}
-# get TPMs for just ZnFs from clusters 4, 22, 37 and 84
-clusterNums <- c(4,22,37,84)
-clusterNames <- sprintf("Cluster%03d", clusterNums)
-cl4_22_37_84_ZnFsList <- lapply(as.list(clusterNames), 
-                                      function(name, ZnFs){ 
-                                        rownames(ZnFs)[ ZnFs$cluster == name ] },
-                                      ZnFs
-                              )
-get_tpms_by_geneIds <- function( geneIds ){
-  tpmSubset <- tpm[ geneIds, ]
-  tpmSubset <- tpmSubset[ !(grepl("NA", rownames(tpmSubset))), ]
-  return( tpmSubset )
-}
-cl4_22_37_84_ZnFsTpmList <- lapply( cl4_22_37_84_ZnFsList, get_tpms_by_geneIds )
-cl4_22_37_84_ZnFsTpmInfoList <- vector( 'list', length=length(cl4_22_37_84_ZnFsList) )
-
-# cluster genes within each biolayout cluster
-# then join together to plot
-for(i in seq_len(length(cl4_22_37_84_ZnFsList)) ){
-  cl4_22_37_84_ZnFsTpmInfoList[[i]] <- 
-    cluster_and_plot_tpms(log10(cl4_22_37_84_ZnFsTpmList[[i]]+1) )
-}
-
-cl4_22_37_84ZnFslog10Tpm <- do.call( rbind, 
-                            lapply(cl4_22_37_84_ZnFsTpmInfoList, function(x){ x$tpms } ) )
-
-cl4_22_37_84_ZnF_tpmsInfo <- cluster_and_plot_tpms( cl4_22_37_84ZnFslog10Tpm, 
-                                                    cluster = FALSE,
-                                                    reverseGenes = TRUE )
-# make a dataframe for plotting cluster membership
-cl4_22_37_84_annoData <- data.frame(
-  geneId = factor( rownames(cl4_22_37_84_ZnF_tpmsInfo$tpms),
-                   levels = rev( rownames(cl4_22_37_84_ZnF_tpmsInfo$tpms) ) ),
-  cluster = c( rep("Cluster004", nrow(cl4_22_37_84_ZnFsTpmList[[1]]) ),
-               rep("Cluster022", nrow(cl4_22_37_84_ZnFsTpmList[[2]]) ),
-               rep("Cluster037", nrow(cl4_22_37_84_ZnFsTpmList[[3]]) ),
-               rep("Cluster084", nrow(cl4_22_37_84_ZnFsTpmList[[4]]) ) 
-               ),
-  AnnoType = rep( "Cluster", nrow(cl4_22_37_84_ZnF_tpmsInfo$tpms) )
-)
-# tile plot of cluster membership
-cl4_22_37_84_ClusterTilePlot <- ggplot( data = cl4_22_37_84_annoData, aes(x=AnnoType, y=geneId, fill=cluster) ) + 
-  geom_tile() + scale_y_discrete(labels=NULL) + 
-  scale_x_discrete(labels=NULL) + 
-  scale_fill_manual( values = colPalette, na.value = "white") + theme_void()
-
-```
-
-```{r NLR_log10_tpms}
-nlrFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'NLR-ENS-GRCz10.txt')
-nlrData <- read.table(nlrFile)
-colnames(nlrData) <- c("geneID")
-nlrRawtpms <- tpm[ as.character(nlrData$geneID), ]
-nlrlogtpms <- log10( nlrRawtpms + 1 )
-nlrlogtpmsInfo <- cluster_and_plot_tpms( nlrlogtpms, cluster = FALSE )
-```
-
 ```{r }
 #' plotExprByChr
 #' Plot the expression of genes from a section (or all) of chromosome
@@ -2716,14 +2643,149 @@ plotExprByChr <- function( chr, start = 1, end = NULL, position = TRUE, tpm = tp
 }
 ```
 
-```{r znfs_22, include=TRUE}
+# Chr 4 Expression plot
+
+```{r all_chr4_genes, include=TRUE}
+chr4_GeneExprList <- plotExprByChr( '4', tpm = tpmFilt )
+```
+
+```{r chr4Expr_plus_cluster, include=TRUE}
+# figure out a colour palette including all the clusters that have more than 8 genes on chr 4.
+chr4ClusterData <- droplevels( cluster_data[ rownames(chr4_GeneExprList$tpms), c("cluster", "start") ] )
+chr4ClusterData$geneId <- factor( rownames(chr4_GeneExprList$tpms),
+                                  levels = rownames(chr4_GeneExprList$tpms) )
+rownames(chr4ClusterData) <- rownames(chr4_GeneExprList$tpms)
+
+for( clusterName in names(table(chr4ClusterData$cluster))[ table(chr4ClusterData$cluster) <= 8 ] ){
+  chr4ClusterData$cluster[ chr4ClusterData$cluster == clusterName ] <- NA
+}
+chr4ClusterData <- droplevels(chr4ClusterData)
+```
+
+There are `sum(table(chr4ClusterData$cluster) > 8)` clusters with more than 8 genes on chr 4. Need a colour palette for 9 clusters.
+
+```{r set_colour_palette}
+# set everything but clusters 7, 23, 26 and 135 to black
+cluster_colour_palette <- 
+  colour_blind_palette[
+    c('black', 'black', 'black', 'black', 'black', 
+      'blue', 'vermillion', 'blue_green', 'orange')
+  ]
+names(cluster_colour_palette) <- names(table(chr4ClusterData$cluster))[ table(chr4ClusterData$cluster) > 8 ]
+```
+
+```{r znf_log10TPM_heatmap, include=TRUE}
+# get TPMs for just ZnFs from clusters 4, 22, 37 and 84
+znf_cluster_numbers <- c(7,23,26,135)
+clusterNames <- sprintf("Cluster%03d", znf_cluster_numbers)
+znf_cluster_ZnFsList <- lapply(as.list(clusterNames), 
+                                      function(name, ZnFs){ 
+                                        rownames(ZnFs)[ ZnFs$cluster == name ] },
+                                      ZnFs
+                              )
+get_tpms_by_geneIds <- function( geneIds ){
+  tpmSubset <- tpmFilt[ geneIds, ]
+  tpmSubset <- tpmSubset[ !(grepl("NA", rownames(tpmSubset))), ]
+  return( tpmSubset )
+}
+znf_cluster_ZnFsTpmList <- lapply( znf_cluster_ZnFsList, get_tpms_by_geneIds )
+
+znf_cluster_ZnFsTpm <- do.call(rbind, znf_cluster_ZnFsTpmList)
+
+znf_cluster_ZnFsTpmInfoList <- vector( 'list', length=length(znf_cluster_ZnFsList) )
+# cluster genes within each biolayout cluster
+# then join together to plot
+for(i in seq_len(length(znf_cluster_ZnFsList)) ){
+  znf_cluster_ZnFsTpmInfoList[[i]] <- 
+    cluster_and_plot_tpms(log10(znf_cluster_ZnFsTpmList[[i]]+1) )
+}
+
+znf_cluster_ZnFslog10Tpm <- do.call( rbind, 
+                            lapply(znf_cluster_ZnFsTpmInfoList, function(x){ x$tpms } ) )
+
+znf_cluster_ZnF_tpmsInfo <- cluster_and_plot_tpms( znf_cluster_ZnFslog10Tpm, 
+                                                    cluster = FALSE,
+                                                    reverseGenes = TRUE )
+# make a dataframe for plotting cluster membership
+cluster_names_list <- vector('list', length = length(clusterNames) )
+i <- 1
+for( name in clusterNames ){
+  cluster_names_list[[i]] <- rep(name, length(znf_cluster_ZnFsList[[i]]))
+  i <- i + 1
+}
+cluster_names <- do.call(c, cluster_names_list)
+
+znf_cluster_annoData <- data.frame(
+  geneId = factor( rownames(znf_cluster_ZnF_tpmsInfo$tpms),
+                   levels = rev( rownames(znf_cluster_ZnF_tpmsInfo$tpms) ) ),
+  cluster = cluster_names,
+  AnnoType = rep( "Cluster", nrow(znf_cluster_ZnF_tpmsInfo$tpms) )
+)
+# tile plot of cluster membership
+znf_cluster_ClusterTilePlot <- ggplot( data = znf_cluster_annoData, aes(x=AnnoType, y=geneId, fill=cluster) ) + 
+  geom_tile() + scale_y_discrete(labels=NULL) + 
+  scale_x_discrete(labels=NULL) + 
+  scale_fill_manual( values = cluster_colour_palette, na.value = "white",
+                     guide = guide_legend(title = 'Cluster')) + theme_void()
+
+```
+
+```{r ZnF_exp_profiles, include=TRUE}
+znf_profile_data <- do.call(rbind, 
+                                 lapply(znf_cluster_numbers,
+                                        function(x){
+                                          cluster_profile_data_list[[x]] }
+                                 )
+)
+cb_palette <- colour_blind_palette[c('blue', 'vermillion', 'blue_green', 'orange')]
+names(cb_palette) <- clusterNames
+znf_clusters_profiles_plot <- 
+  ggplot(data = znf_profile_data, 
+          aes(x = stage, y = mean_tpm, group = cluster_name,
+                 colour = cluster_name) ) + 
+    geom_path( size = 1 ) +
+    scale_color_manual(values = cb_palette,
+                       guide = guide_legend(title = 'Cluster')) + 
+    labs(x = 'Stage', y = 'mean TPM') + 
+    theme_minimal() +
+    theme( axis.text.x = element_blank())
+
+postscript(file = file.path(rootPath, 'plots', 'Fig.5b.eps'),
+           width = 7, height = 5, paper = 'special', horizontal = FALSE)
+print(znf_clusters_profiles_plot)
+dev.off()
+
+```
+
+```{r NLR_log10_tpms}
+nlrFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'NLR-ENS-GRCz10.txt')
+nlrData <- read.table(nlrFile)
+colnames(nlrData) <- c("geneID")
+# one of these genes is down as being both a ZnF gene and a NLR gene
+# Looks like an annotation error to me. Either way, remove it from this set.
+nlrData_genes <- as.character(nlrData$geneID)[ as.character(nlrData$geneID) != 'ENSDARG00000090160' ]
+# get gene info (chr, start, end)
+nlrData_by_posn <- 
+  do.call(rbind,
+          lapply(nlrData_genes, 
+                 function(x){ AllGenesInfo[ AllGenesInfo$ensembl_gene_id == x, ] } ) )
+
+nlrRawtpms <- tpm[ nlrData_genes, ]
+nlrlogtpms <- log10( nlrRawtpms + 1 )
+nlrlogtpmsInfo <- cluster_and_plot_tpms( nlrlogtpms, cluster = FALSE )
+
+
+```
+
+```{r znfs_22, include=TRUE, eval=FALSE}
 znfs_22Region = list( chr = "22", start = 1900000, end = 2900000 )
 znfs_22 <- plotExprByChr( znfs_22Region$chr, znfs_22Region$start, znfs_22Region$end )
 
 # get gene info from biomart
-znfs_22Pfam <- getGenesAndPfam( ensBiomart, znfs_22Region$chr, 
-                                znfs_22Region$start, znfs_22Region$end, 
-                                pfamDesc )
+znfs_22_specific_genes <- as.character( getGenesForRegion(znfs_22Region$chr, znfs_22Region$start, znfs_22Region$end, AllGenesInfo)$ensembl_gene_id )
+
+znfs_22Pfam <- getPfamForGenes( ensBiomart, znfs_22_specific_genes, pfamDesc )
+
 # join to AllGenesInfo
 znfs_22PfamInfo <- merge(AllGenesInfo, znfs_22Pfam, 
                        by.x = c('ensembl_gene_id'), by.y = c('ensembl_gene_id') )
@@ -2737,25 +2799,12 @@ names(znfs_22PfamInfo)[ grepl("external_gene_name.y", names(znfs_22PfamInfo)) ] 
 
 ```
 
-```{r all_chr4_genes, include=TRUE}
-chr4_GeneExprList <- plotExprByChr( '4' )
-```
-
 ```{r chr4Expr_plus_cluster, include=TRUE}
-chr4ClusterData <- droplevels( clusterData[ rownames(chr4_GeneExprList$tpms), c("cluster", "start") ] )
-chr4ClusterData$geneId <- factor( rownames(chr4_GeneExprList$tpms),
-                                  levels = rownames(chr4_GeneExprList$tpms) )
-rownames(chr4ClusterData) <- rownames(chr4_GeneExprList$tpms)
-
-for( clusterName in names(table(chr4ClusterData$cluster))[ table(chr4ClusterData$cluster) <= 8 ] ){
-  chr4ClusterData$cluster[ chr4ClusterData$cluster == clusterName ] <- NA
-}
-chr4ClusterData <- droplevels(chr4ClusterData)
-
 chr4ClusterTilePlotMultiTrack <- ggplot( data = chr4ClusterData, aes(x=cluster, y=geneId, fill=cluster) ) + 
   geom_tile() + scale_y_discrete(labels=NULL) + 
   scale_x_discrete(labels=NULL) + 
-  scale_fill_manual(values = colPalette, na.value = "white") + theme_void()
+  scale_fill_manual(values = cluster_colour_palette, na.value = "white") + 
+  theme_void() + theme( legend.position = 'none')
 
 ```
 
@@ -2764,35 +2813,40 @@ chr4ClusterTilePlotMultiTrack <- ggplot( data = chr4ClusterData, aes(x=cluster, 
 ```{r plotfig4a, include=TRUE, warning=FALSE}
 # figure out max expression level
 maxValue <- round( max( log10(chr4_GeneExprList$tpms+1), 
-                        cl4_22_37_84_ZnF_tpmsInfo$tpms, 
-                        nlrlogtpmsInfo$tpms, 
-                        log10(znfs_22$tpms+1) ), 
+                        znf_cluster_ZnF_tpmsInfo$tpms, 
+                        nlrlogtpmsInfo$tpms
+                        ), 
                    digits = 1 )
 
-## CLUSTER 4,22,37 & 84 TPMs + cluster membership
+## ZnF CLUSTER TPMs + cluster membership
 # arrange the two plots together
 grid.newpage()
 grid.draw( 
-  arrangeGrob( grobs = list( cl4_22_37_84_ZnF_tpmsInfo$plot + 
+  arrangeGrob( grobs = list( znf_cluster_ZnF_tpmsInfo$plot + 
                                scale_fill_gradientn( limits = c(0,maxValue),
                                  colours = c("blue", "yellow", "red"),
                                   guide = guide_colorbar(title = "log10 TPM") ),
-                             cl4_22_37_84_ClusterTilePlot ), 
+                             znf_cluster_ClusterTilePlot), 
                nrow = 1,
                widths=c(0.78,0.22)
               )
 )
 
-# output to pdf
-pdf(file=file.path(rootPath, 'plots',
-                          'Figure.4a.pdf') )
+# output to eps
+postscript(file=file.path(rootPath, 'plots', 'Figure.4a.eps'),
+           width = 8, height = 6, horizontal = TRUE)
 grid.newpage()
 grid.draw( 
-  arrangeGrob( grobs = list( cl4_22_37_84_ZnF_tpmsInfo$plot + 
+  arrangeGrob( grobs = list( znf_cluster_ZnF_tpmsInfo$plot + 
                                scale_fill_gradientn( limits = c(0,maxValue),
                                  colours = c("blue", "yellow", "red"),
-                                  guide = guide_colorbar(title = "log10 TPM") ),
-                             cl4_22_37_84_ClusterTilePlot ), 
+                                  guide = guide_colorbar(title = "log10 TPM") ) +
+                               theme(legend.text = element_text(size = 12),
+                                     legend.title = element_text(size = 14)),
+                             znf_cluster_ClusterTilePlot + 
+                               theme(legend.text = element_text(size = 12),
+                                     legend.title = element_text(size = 14))
+                            ), 
                nrow = 1,
                widths=c(0.78,0.22)
               )
@@ -2808,15 +2862,18 @@ print( nlrlogtpmsInfo$plot + scale_fill_gradientn( limits = c(0,maxValue),
                                  colours = c("blue", "yellow", "red"),
                                   guide = guide_colorbar(title = "log10 TPM") ) )
 
-pdf(file=file.path(rootPath, 'plots', 'Figure.4c.pdf'))
+postscript(file=file.path(rootPath, 'plots', 'Figure.4c.eps'),
+           width = 8, height = 6, horizontal = TRUE)
 print( nlrlogtpmsInfo$plot + scale_fill_gradientn( limits = c(0,maxValue),
                                  colours = c("blue", "yellow", "red"),
-                                  guide = guide_colorbar(title = "log10 TPM") ) )
+                                  guide = guide_colorbar(title = "log10 TPM") ) +
+                                  theme(legend.text = element_text(size = 12),
+                                        legend.title = element_text(size = 14)) )
 dev.off()
 ```
 
 ### Fig4D - Chr22 Znf genes tpm heatmap
-```{r fig4d, include=TRUE, warning=FALSE}
+```{r fig4d, include=TRUE, warning=FALSE, eval=FALSE}
 # ZnF chr 22 plot
 print( znfs_22$plot + 
          scale_fill_gradientn( limits = c(0,maxValue),
@@ -2843,22 +2900,33 @@ grid.draw(
                                theme(plot.title=element_blank()) +
                                scale_fill_gradientn( limits = c(0,maxValue),
                                  colours = c("blue", "yellow", "red"),
-                                  guide = guide_colorbar(title = "log10 TPM") ),
-                             chr4ClusterTilePlotMultiTrack ),
+                                  guide = guide_colorbar(title = "log10\nTPM") ) + 
+                               theme( axis.text.y = element_text(size = 12),
+                                      axis.ticks.y = element_line( colour="black"),
+                                      legend.title = element_text(size = 14) ),
+                             chr4ClusterTilePlotMultiTrack +
+                               theme(legend.text = element_text(size = 12),
+                                      legend.title = element_text(size = 14)) ),
                nrow = 1,
                widths=c(0.7,0.3)
               )
 )
 
-pdf(file=file.path(rootPath, 'plots', 'Figure.4e.pdf'))
+postscript(file=file.path(rootPath, 'plots', 'Figure.4d.eps'),
+           width = 8, height = 6, horizontal = TRUE)
 grid.newpage()
 grid.draw( 
   arrangeGrob( grobs = list( chr4_GeneExprList$plot + 
                                theme(plot.title=element_blank()) +
                                scale_fill_gradientn( limits = c(0,maxValue),
                                  colours = c("blue", "yellow", "red"),
-                                  guide = guide_colorbar(title = "log10 TPM") ),
-                             chr4ClusterTilePlotMultiTrack ),
+                                  guide = guide_colorbar(title = "log10\nTPM") ) +
+                               theme( axis.text.y = element_text(size = 12),
+                                      axis.ticks.y = element_line( colour="black"),
+                                      legend.title = element_text(size = 14) ),
+                             chr4ClusterTilePlotMultiTrack +
+                               theme(legend.text = element_text(size = 12),
+                                      legend.title = element_text(size = 14)) ),
                nrow = 1,
                widths=c(0.7,0.3)
               )
@@ -2868,14 +2936,14 @@ dev.off()
 
 ### Fig4F-G - histograms of ZnF/NLR genes on chr 4
 ```{r hist, include=TRUE}
-plotData <- merge( chr4ZnFData, clusterData, by.x = "ensembl_gene_id", by.y = "gene_id" )
+plotData <- merge( chr4ZnFData, cluster_data, by.x = "ensembl_gene_id", by.y = "gene_id" )
 plotData$mid <- plotData$start + (plotData$end - plotData$start)/2
 
-histData <- rbind(
-  plotData[ plotData$cluster == "Cluster004", ],
-  plotData[ plotData$cluster == "Cluster022", ],
-  plotData[ plotData$cluster == "Cluster037", ],
-  plotData[ plotData$cluster == "Cluster084", ]
+histData <- do.call(rbind,
+  lapply(clusterNames,
+         function(name){
+           plotData[ plotData$cluster == name, ]
+         })
 )
 
 ZnF_hist <- ggplot( data = histData ) +
@@ -2883,35 +2951,81 @@ ZnF_hist <- ggplot( data = histData ) +
   labs(x = 'Position (Mb)', y = "Gene Count") + 
   scale_x_continuous(limits=c(0,80000000)) + theme_minimal()
 
-plotList <- add_to_plot_list( plotList, ZnF_hist, 
-                              file.path(file.path(rootPath, 'plots', 'Figure.4f.pdf')) )
+ggplot( data = histData ) +
+  geom_density( aes( x = mid )) + 
+  labs(x = 'Position (Mb)', y = "Gene Count") + 
+  scale_x_continuous(limits=c(0,80000000)) + theme_minimal()
+
+
+pdf(file = file.path(rootPath, 'plots', 'Figure.4f.pdf'))
+print(ZnF_hist)
+dev.off()
 
 print(ZnF_hist)
 ```
 
-Histogram showing the distribution of genes in clusters 4, 22, 37 and 84.
+Histogram showing the distribution of genes in clusters 7, 23, 26 and 135.
 
 ```{r nlr_dist, include=TRUE}
 # merge NLR gene ids to AllGenesInfo to subset to NLR genes
 nlrGeneInfo <- merge(AllGenesInfo, nlrData, by.x = "ensembl_gene_id", by.y = "geneID")
+# remove ENSDARG00000090160: labelled as both ZnF and NLR. Looks like annotation error
+nlrGeneInfo <- nlrGeneInfo[ nlrGeneInfo$ensembl_gene_id != 'ENSDARG00000090160', ]
+
 # subset to chr 4
 chr4nlrGeneInfo <- nlrGeneInfo[ nlrGeneInfo$chromosome_name == '4', ]
 
-chr4nlrGeneInfo$mid <- chr4nlrGeneInfo$start_position + (chr4nlrGeneInfo$end_position - chr4nlrGeneInfo$start_position)/2
+chr4nlr_hist_plot_data <- chr4nlrGeneInfo
+chr4nlr_hist_plot_data$mid <- chr4nlr_hist_plot_data$start_position + (chr4nlr_hist_plot_data$end_position - chr4nlr_hist_plot_data$start_position)/2
 
-nlrHist <- ggplot( data = chr4nlrGeneInfo ) +
+nlrHist <- ggplot( data = chr4nlr_hist_plot_data ) +
   geom_histogram( aes( x = mid ), binwidth = 5000000, colour = "white" ) +
   scale_x_continuous(limits=c(0,80000000)) +
   theme_minimal() +
   labs(x = 'Position (Mb)', y = "Gene Count")
 
-plotList <- add_to_plot_list( plotList, nlrHist, 
-                              file.path(file.path(rootPath, 'plots', 'Figure.4g.pdf')) )
+pdf(file = file.path(rootPath, 'plots', 'Figure.4g.pdf'))
+print(nlrHist)
+dev.off()
 
 print(nlrHist)
+
 ```
 
 Histogram showing the distribution of NLR genes on chromosome 4 (binwidth = 5 Mb).
+
+```{r znf_nlr_freqpoly, include=TRUE}
+znf_nlr_hist_data <- rbind(
+  histData[, c('external_gene_name', 'mid')],
+  chr4nlr_hist_plot_data[, c('external_gene_name', 'mid')]
+)
+znf_nlr_hist_data$gene_type <- factor(
+  c( rep('znf', nrow(histData)), rep('nlr', nrow(chr4nlr_hist_plot_data)) ),
+  levels = c('znf', 'nlr')
+)
+znf_nlr_hist <- ggplot( data = znf_nlr_hist_data ) +
+  geom_freqpoly( aes( x = mid, colour = gene_type ), 
+                  binwidth = 5000000 ) +
+  scale_x_continuous(limits=c(0,80000000)) +
+  scale_colour_manual(values = c('firebrick3', 'steelblue2'),
+                      labels = c('Zinc Finger', 'NLR'),
+                      guide = guide_legend(title = NULL)) +
+  theme_minimal() +
+  theme( axis.title = element_text(size = 7),
+         axis.text = element_text(size = 6),
+         legend.title = element_text(size = 7),
+         legend.text = element_text(size = 6) ) +
+  labs(x = 'Position (Mb)', y = "Gene Count")
+
+postscript(file = file.path('plots', 'Figure.4e.hist.eps'),
+           width = 4, height = 3)
+print(znf_nlr_hist)
+dev.off()
+
+print(znf_nlr_hist)
+```
+
+Line graph showing the distribution of ZnF and NLR genes on chromosome 4 (binwidth = 5 Mb).
 
 ### Figure 4-2
 #### histograms of ZnF genes on chr 4, split by cluster
@@ -2919,24 +3033,322 @@ Histogram showing the distribution of NLR genes on chromosome 4 (binwidth = 5 Mb
 ```{r hist_facetted, include=TRUE}
 histxBreaks <- seq(0,80000000,20000000)
 histxLabels <- as.character( seq(0,80,20) )
-cl4_22_37_84_hist <- ggplot( data = histData ) +
+znf_cluster_hist <- ggplot( data = histData ) +
   geom_histogram( aes( x = mid ), binwidth = 5000000, colour = "white" ) + 
   scale_x_continuous( limits=c(0,80000000), breaks = histxBreaks, labels = histxLabels ) +
   labs(x = 'Position (Mb)', y = "Gene Count") +
   facet_wrap( ~ cluster ) +
   theme_minimal()
 
-plotList <- add_to_plot_list( plotList, cl4_22_37_84_hist, 
+plotList <- add_to_plot_list( plotList, znf_cluster_hist, 
                               file.path(rootPath, 'plots', 'Figure.4-2.pdf') )
 
-print(cl4_22_37_84_hist)
+print(znf_cluster_hist)
 ```
 
 Histogram showing the distribution of genes in clusters 4, 22, 37 and 84, split by cluster.
 
+```{r znf_nlr_cor}
+# calc correlation matrix for nlr genes and chr4 znf genes
+# cat together the chr4 znf and nlr gene info and sort by position
+chr4_znf_nlr_data <- rbind( chr4ZnFData, chr4nlrGeneInfo )
+# add category label
+chr4_znf_nlr_data$category <- factor( c( rep('ZnF', nrow(chr4ZnFData) ),
+                                         rep('NLR', nrow(chr4nlrGeneInfo) ) ),
+                                levels = c('ZnF', 'NLR')
+)
+# sort by position
+chr4_znf_nlr_data <- chr4_znf_nlr_data[ order(chr4_znf_nlr_data$start_position), ]
+znf_vs_nlr_tpm <- tpm[ as.character(chr4_znf_nlr_data$ensembl_gene_id), ] # 794 genes
+chr4_znf_nlr_data <- cbind(chr4_znf_nlr_data, znf_vs_nlr_tpm)
+
+# check any for zero sd and remove
+chr4_znf_nlr_data <- chr4_znf_nlr_data[ rowSds(znf_vs_nlr_tpm) != 0, ] # 781 genes
+chr4_znf_nlr_tpm <- chr4_znf_nlr_data[ , 7:96]
+rownames(chr4_znf_nlr_tpm) <- chr4_znf_nlr_data$ensembl_gene_id
+
+# gene cor matrix
+znf_vs_nlr_cor <- cor(t(chr4_znf_nlr_tpm))
+znf_vs_nlr_cor.m <- melt(znf_vs_nlr_cor)
+znf_vs_nlr_cor.m$Var2 <- factor(znf_vs_nlr_cor.m$Var2,
+                                levels = rev(levels(znf_vs_nlr_cor.m$Var2)))
+znf_vs_nlr_CorHeatmap <- ggplot(data = znf_vs_nlr_cor.m) + 
+  geom_tile( aes( x = Var1, y = Var2, fill = value ) ) +
+  scale_fill_gradientn( colours = c("blue", "yellow", "red"), limits = c(-1,1),
+                        guide = 'none' ) +
+  theme_void() 
+
+# make annotation
+annotation_df <- data.frame(
+  gene_id = factor(rownames(chr4_znf_nlr_tpm),
+                   levels = rev(rownames(chr4_znf_nlr_tpm)) ),
+  gene_type = factor( chr4_znf_nlr_data$category,
+                      levels = c('ZnF', 'NLR') )
+)
+annotation_df$cluster_name <- rep(NA, nrow(annotation_df))
+# make environment for cluster look up
+cluster_lookup <- new.env()
+for( gene in rownames(cluster_data) ){
+  if( !is.na(cluster_data[gene, 'cluster']) ){
+    cluster_lookup[[gene]] <- as.character(cluster_data[gene, 'cluster'])
+  }
+}
+for( gene in as.character(annotation_df$gene_id) ){
+  if( exists(gene, envir = cluster_lookup) ){
+    annotation_df[ annotation_df$gene_id == gene, 'cluster_name'] <- cluster_lookup[[gene]]
+  }
+}
+included_cluster_names <- unique(annotation_df$cluster_name)[ !is.na(unique(annotation_df$cluster_name)) ]
+included_cluster_names <- included_cluster_names[ order(included_cluster_names) ]
+
+annotation_df$cluster_name <- factor(annotation_df$cluster_name,
+                                    levels = included_cluster_names )
+
+cluster_colours <- rep('white', length(included_cluster_names))
+names(cluster_colours) <- included_cluster_names
+clust_colours <- c('blue', 'yellow', 'purple', 'vermillion')
+for( i in seq_len(length(znf_cluster_numbers)) ){
+  cluster_colours[ sprintf('Cluster%03d', znf_cluster_numbers[i]) ] <- colour_blind_palette[ clust_colours[i] ]
+}
+
+# strip of gene types ('Znf' or 'NLR')
+gene_type_plot <- ggplot(data = annotation_df) + 
+  geom_tile( aes(x = 1, y = gene_id, fill = gene_type) ) + 
+  scale_fill_manual( values = c('firebrick3', 'steelblue2'),
+                     guide = 'none' ) + 
+  theme_void()
+
+# strip of cluster memberships
+cluster_membership_plot <- ggplot(data = annotation_df) + 
+  geom_tile( aes(x = 1, y = gene_id, fill = cluster_name) ) + 
+  scale_fill_manual( values = cluster_colours, na.value = 'grey80',
+                     guide = 'none') + 
+  theme_void()
+
+# tpm heatmap
+chr4_znf_nlr_tpm_heatmap <- ggplotExprHeatmap( log10( as.matrix(chr4_znf_nlr_tpm) + 1 ), legendPosition = 'none' )
+
+# legends
+g_legend <- function(a.gplot){ 
+  tmp <- ggplot_gtable(ggplot_build(a.gplot)) 
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
+  legend <- tmp$grobs[[leg]] 
+  return(legend)
+} 
+
+plot_tmp <- gene_type_plot + guides( fill = guide_legend(title = 'Category'))
+legend_1 <- g_legend(plot_tmp)
+
+plot_tmp <- cluster_membership_plot + guides( fill = guide_legend(title = 'Cluster'))
+legend_2 <- g_legend(plot_tmp)
+
+plot_tmp <- znf_vs_nlr_CorHeatmap + guides( fill = guide_colourbar(title = 'Pearson\nCorrelation\nCoefficient'))
+legend_3 <- g_legend(plot_tmp)
+
+plot_tmp <- ggplotExprHeatmap( log10( as.matrix(chr4_znf_nlr_tpm) + 1 ), legendPosition = 'right' ) + 
+  guides( fill = guide_colourbar(title = 'Expression (TPM)'))
+legend_4 <- g_legend(plot_tmp)
+
+rm(plot_tmp)
+
+# layout matrix
+lay <- cbind( rep(1,4),
+              rep(2,4),
+              rep(3,4),
+              rep(4,4),
+              5:8 )
+
+postscript(file = file.path(rootPath, 'plots', 'znf_vs_nlr_cor-all.eps'),
+    width = 5, height = 3.5 )
+# pdf(file = file.path(rootPath, 'plots', 'znf_vs_nlr_cor-all.pdf'),
+#     width = 5, height = 3.5 )
+grid.newpage()
+grid.draw( 
+  arrangeGrob( grobs = list( gene_type_plot,
+                             cluster_membership_plot,
+                             znf_vs_nlr_CorHeatmap,
+                             chr4_znf_nlr_tpm_heatmap
+                             ),
+               nrow = 1,
+               widths=c(0.05,0.05,0.7, 0.2)
+              )
+)
+dev.off()
+
+# plot each legend separately
+postscript(file = file.path(rootPath, 'plots', 'znf_nlr_category_strip.legend.eps'),
+           width = 6, height = 4)
+grid.draw(legend_1) 
+dev.off()
+
+postscript(file = file.path(rootPath, 'plots', 'znf_nlr_cluster_membership_plot_strip.legend.eps'),
+           width = 6, height = 4)
+grid.draw(legend_2) 
+dev.off()
+
+postscript(file = file.path(rootPath, 'plots', 'znf_nlr_cor_heatmap.legend.eps'),
+           width = 6, height = 4)
+grid.draw(legend_3) 
+dev.off()
+
+
+postscript(file = file.path(rootPath, 'plots', 'znf_nlr_tpm_heatmap.legend.eps'),
+           width = 6, height = 4)
+grid.draw(legend_4) 
+dev.off()
+
+```
+
+```{r all_chr4_genes}
+# chr 4 genes: chr4_specific_gene_info
+chr4_specific_gene_info <- getGenesForRegion(chr4Region$chr, chr4Region$start, chr4Region$end, AllGenesInfo)
+
+# check for chr4 genes in tpm
+chr4_with_tpm <- 
+  chr4_specific_gene_info[ sapply(chr4_specific_gene_info$ensembl_gene_id, 
+                            function(x){ any( rownames(tpm) == x ) } ), ]
+
+chr4_with_tpm$gene_type <- rep(NA, nrow(chr4_with_tpm))
+for( gene in as.character(chr4ZnFData$ensembl_gene_id) ){
+  chr4_with_tpm$gene_type[ chr4_with_tpm$ensembl_gene_id == gene ] <- 'ZnF'
+}
+for( gene in as.character(chr4nlrGeneInfo$ensembl_gene_id) ){
+  chr4_with_tpm$gene_type[ chr4_with_tpm$ensembl_gene_id == gene ] <- 'NLR'
+}
+chr4_with_tpm$gene_type <- factor(chr4_with_tpm$gene_type,
+                                  levels = c('ZnF', 'NLR') )
+
+chr4_with_tpm$cluster_name <- rep(NA, nrow(chr4_with_tpm))
+znf_cluster_names <- sprintf('Cluster%03d', c(7,23,26,135))
+for( gene in as.character(chr4_with_tpm$ensembl_gene_id) ){
+  if( exists(gene, envir = cluster_lookup) ){
+    cluster_name <- cluster_lookup[[gene]]
+    if(cluster_name %in% znf_cluster_names){
+      chr4_with_tpm$cluster_name[ chr4_with_tpm$ensembl_gene_id == gene ] <- cluster_name
+    } else {
+      chr4_with_tpm$cluster_name[ chr4_with_tpm$ensembl_gene_id == gene ] <- 'Other'
+    }
+  }
+}
+
+included_cluster_names <- as.character( unique(chr4_with_tpm$cluster_name)[ !is.na(unique(chr4_with_tpm$cluster_name)) ] )
+included_cluster_names <- included_cluster_names[ order(included_cluster_names) ]
+chr4_with_tpm$cluster_name <- factor(chr4_with_tpm$cluster_name,
+                                              levels = included_cluster_names )
+
+clust_colours <- c('blue', 'yellow', 'purple', 'vermillion', 'white')
+cluster_colours <- character( length = length(included_cluster_names))
+for( i in seq_len(length(included_cluster_names)) ){
+  cluster_colours[i] <- colour_blind_palette[ clust_colours[i] ]
+}
+names(cluster_colours) <- included_cluster_names
+cluster_colours['Other'] <- 'white'
+
+# get tpms
+chr4_with_tpm <- chr4_with_tpm[ order(chr4_with_tpm$start_position), ]
+chr4_tpm <- tpm[ as.character(chr4_with_tpm$ensembl_gene_id), ] # 1300 genes
+
+# check any for zero sd and remove
+zero_sd <- rowSds(chr4_tpm) != 0 # 1176 genes
+chr4_with_tpm <- chr4_with_tpm[ zero_sd, ]
+chr4_tpm <- chr4_tpm[ zero_sd, ]
+
+# gene cor matrix
+chr4_cor <- cor(t(chr4_tpm))
+chr4_cor.m <- melt(chr4_cor)
+chr4_CorHeatmap <- ggplot(data = chr4_cor.m) + 
+  geom_tile( aes( x = Var1, y = Var2, fill = value ) ) +
+  scale_fill_gradientn( colours = c("blue", "yellow", "red"), limits = c(-1,1),
+                        guide = 'none' ) +
+  theme_void() 
+
+# set levels of gene id to match tpm plot
+chr4_with_tpm$ensembl_gene_id <- factor(chr4_with_tpm$ensembl_gene_id,
+                                        levels = chr4_with_tpm$ensembl_gene_id)
+
+# strip of gene types ('Znf' or 'NLR')
+gene_type_plot <- ggplot(data = chr4_with_tpm) + 
+  geom_tile( aes(x = 1, y = ensembl_gene_id, fill = gene_type) ) + 
+  scale_fill_manual( values = c('firebrick3', 'steelblue2'),
+                     na.value = 'grey80',
+                     guide = 'none' ) + 
+  theme_void()
+
+# strip of cluster memberships
+cluster_membership_plot <- ggplot(data = chr4_with_tpm) + 
+  geom_tile( aes(x = 1, y = ensembl_gene_id, fill = cluster_name) ) + 
+  scale_fill_manual( values = cluster_colours, na.value = 'grey80',
+                     guide = 'none') + 
+  theme_void()
+
+# tpm heatmap
+# reorder matrix to plot it the other way up to match the cor matrix
+ordering <- seq(nrow(chr4_tpm),1)
+chr4_tpm_tmp <- chr4_tpm[ ordering, ]
+chr4_tpm_heatmap <- ggplotExprHeatmap( log10( as.matrix(chr4_tpm_tmp) + 1 ), legendPosition = 'none' )
+
+# plot without legends
+# postscript(file = file.path(rootPath, 'plots', 'chr4_cor.eps'),
+#     width = 5, height = 3.5 )
+pdf(file = file.path(rootPath, 'plots', 'chr4_cor.pdf'),
+    width = 5, height = 3.5 )
+tiff(file = file.path(rootPath, 'plots', 'chr4_cor.tiff'),
+    width = 2000, height = 1400, compression = "lzw" )
+png(file = file.path(rootPath, 'plots', 'chr4_cor.png'),
+    width = 2000, height = 1400 )
+grid.newpage()
+grid.draw( 
+  arrangeGrob( grobs = list( gene_type_plot,
+                             cluster_membership_plot,
+                             chr4_CorHeatmap,
+                             chr4_tpm_heatmap
+                             ),
+               nrow = 1,
+               widths=c(0.05,0.05,0.7,0.2)
+              )
+)
+dev.off()
+
+# plot the legends
+legends <- vector('list', length = 4)
+plot_tmp <- gene_type_plot + guides( fill = guide_legend(title = 'Category')) + 
+  theme(legend.title = element_text( size = 14) , 
+        legend.text = element_text( size = 12) )
+legends[[1]] <- g_legend(plot_tmp)
+
+plot_tmp <- cluster_membership_plot + guides( fill = guide_legend(title = 'Cluster')) + 
+  theme(legend.title = element_text( size = 14) , 
+        legend.text = element_text( size = 12) )
+legends[[2]] <- g_legend(plot_tmp)
+
+plot_tmp <- chr4_CorHeatmap + guides( fill = guide_colourbar(title = 'Pearson\nCorrelation\nCoefficient')) +
+  theme(legend.title = element_text( size = 14) , 
+        legend.text = element_text( size = 12) )
+legends[[3]] <- g_legend(plot_tmp)
+
+plot_tmp <- ggplotExprHeatmap( log10( as.matrix(chr4_tpm_tmp) + 1 ), legendPosition = 'right' ) + 
+  guides( fill = guide_colourbar(title = 'Expression (TPM)')) + 
+  theme(legend.title = element_text( size = 14) , 
+        legend.text = element_text( size = 12) )
+legends[[4]] <- g_legend(plot_tmp)
+
+rm(plot_tmp)
+
+postscript(file = file.path(rootPath, 'plots', 'chr4_cor.legends.eps'),
+    width = 2, height = 7 )
+grid.newpage()
+grid.draw( 
+  arrangeGrob( grobs = legends,
+               ncol = 1,
+               heights=c(0.2, 0.3, 0.25, 0.25)
+              )
+)
+dev.off()
+
+```
 #### Regional expression
 
-### Figure 4-3A
+### Figure 4
 
 ```{r manhattan, include=TRUE}
 # get chr lengths for seqinfo object
