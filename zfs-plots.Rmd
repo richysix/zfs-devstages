@@ -630,7 +630,13 @@ dev.off()
 ```
 
 ```{r long_pec_vs_early_stages, eval=FALSE}
+# This is to look at what is driving the difference between Pearson and 
+# Spearman correlation coefficients
+# One gene that is very highly expressed (ENSDARG00000080337) 
+# has a disproportionate effect on the Pearson coefficient
+
 # plot tpms against each other for every sample against long-pec-5
+# to look at what is influencing Pearson
 pdf(file= file.path(rootPath, 'plots', 'tpm_scatterplots.pdf') )
 sample_names <- as.character(rnaseqSampleInfo$sampleName)
 for(i in seq_len(length(sample_names))){
@@ -657,8 +663,8 @@ dev.off()
 
 # Pearson is skewed by one highly expressed gene
 which( tpmFilt[, '1-cell-1'] > 200000 )
-ENSDARG00000080337 
-             15809
+# ENSDARG00000080337 
+#              15809
 
 # redo pearson without that gene
 tpmFiltnoMT <- tpmFilt[ !(rownames(tpmFilt) == 'ENSDARG00000080337'), ]
