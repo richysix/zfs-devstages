@@ -1377,9 +1377,9 @@ if( file.exists(AllGenesInfoFile) ){
   # ensBiomart <- useMart( "ensembl", dataset="drerio_gene_ensembl")
   ensBiomart <- useMart(host='jul2016.archive.ensembl.org', biomart = "ENSEMBL_MART_ENSEMBL", dataset="drerio_gene_ensembl")
   
-  # Biomart query to get chr, start and end for NLR genes
-  # filter: ensembl_gene_id, values = NLR gene ids
-  # attributes: ensembl_gene_id, chromosome_name, start_position, end_position
+  # Biomart query to get chr, start and end for all genes
+  # filter: ensembl_gene_id, values = ''
+  # attributes: ensembl_gene_id, external_gene_name, chromosome_name, start_position, end_position
   AllGenesInfo <- getBM(
     filters = "",
     attributes = c('ensembl_gene_id', 'external_gene_name',
@@ -1390,6 +1390,9 @@ if( file.exists(AllGenesInfoFile) ){
   
   write.table(AllGenesInfo, file = AllGenesInfoFile, sep="\t", quote = FALSE, col.names = TRUE, row.names = FALSE)
 }
+
+# add gene ids as row names for subsetting
+rownames(AllGenesInfo) <- AllGenesInfo$ensembl_gene_id
 
 # make named vector of gene names for later
 geneNames <- as.character( AllGenesInfo$external_gene_name )
