@@ -2402,10 +2402,41 @@ chr4_ZnF_geneInfo <- chr4_ZnF_geneInfo[ order(chr4_ZnF_geneInfo$start_position),
 chr4ZnFData <- unique(chr4_ZnF_geneInfo[ , 1:5 ])
 ```
 
+```{r get_pfam_for_znf_clusters}
+znf_cluster_numbers <- c(7,23,26,135)
+znf_clusters <- do.call(rbind, 
+                        lapply(znf_cluster_numbers,
+                               function(x){ clusters[[x]] } )
+)
+
+# number of chr 4 genes
+table(znf_clusters$chr)['4']
+#   4 
+# 168 
+
+# get pfam info
+znf_clusters_Pfam <- getPfamForGenes( ensBiomart, 
+                                      as.character(znf_clusters$gene_id), pfamDesc )
+# join to znf_clusters
+znf_clusters_Pfam <- merge(znf_clusters, znf_clusters_Pfam, by.x = 'gene_id', by.y = 'ensembl_gene_id')
+# subset to chr 4
+znf_clusters_chr4_pfam <- znf_clusters_Pfam[ znf_clusters_Pfam$chr == '4', ]
+
+# get pfam ids for zinc finger
+pfam2desc <- unique(znf_clusters_chr4_pfam[c('pfam', 'pfamDescription')])
+znf_pfam_ids <- pfam2desc$pfam[ grepl('[Zz]inc finger', pfam2desc$pfamDescription) ]
+# subset to genes with zinc finger domain and count them
+znf_clusters_chr4_znf_domain <- do.call(c, lapply(znf_pfam_ids, function(x){ as.character( znf_clusters_chr4_pfam$gene_id[ znf_clusters_chr4_pfam$pfam == x ] ) }) )
+
+# number of genes with a ZnF domain
+length(unique(znf_clusters_chr4_znf_domain))
+# 153
+```
+
 ```{r chr4_ZnF, include=TRUE}
 # ZnF genes in clusters
-ZnFs <- clusterData[ as.character(chr4ZnFData$ensembl_gene_id), ]
-ZnFs <- ZnFs[ !is.na(ZnFs$name), ]
+ZnFs <- cluster_data[ as.character(chr4ZnFData$ensembl_gene_id), ]
+ZnFs <- ZnFs[ !is.na(ZnFs$cluster), ]
 clusterCounts <- as.data.frame( table( ZnFs$cluster ) )
 colnames(clusterCounts)[1] <- "Cluster"
 clustersOverFive <- clusterCounts[ clusterCounts$Freq >= 5, ]
@@ -2422,13 +2453,13 @@ The table below shows the clusters with enrichments significantly larger than ex
 # prob is number of Chr 4 ZnF genes / total genes
 TestRes <- vector( "list", length = length(levels(clusterCounts$Cluster)) )
 i <- 1
-prob <- nrow(ZnFs) / nrow(clusterData)
+prob <- nrow(ZnFs) / nrow(cluster_data)
 for( clusterName in levels(clusterCounts$Cluster) ){
   freq <- clusterCounts$Freq[ clusterCounts$Cluster == clusterName ]
   if( freq < 4 ){
     cat(clusterName, ": Too few Genes...", freq, ". Skipping...\n")
   } else{
-    clusterSize <- nrow(clusterData[clusterData$cluster == clusterName, ])
+    clusterSize <- nrow(cluster_data[cluster_data$cluster == clusterName, ])
     TestRes[[i]] <- binomTest( freq, 
                                clusterSize, prob, clusterName, 'Chr4ZnF' )
     i <- i + 1
