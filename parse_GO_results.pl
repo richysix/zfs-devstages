@@ -14,6 +14,8 @@ use DateTime;
 # get options
 my %options;
 my $SIG_LEVEL;
+my $FOLD_ENRICHMENT;
+my $MIN_GENES;
 get_and_check_options();
 
 # open gene list
@@ -99,8 +101,8 @@ else{
             print {$out_fh} "    - $gene_info", "\n";
         }
         
-        if( $info_for{$term}{significant}/$info_for{$term}{expected} >= 1.5 &&
-            $info_for{$term}{significant} >= 6 ){
+        if( $info_for{$term}{significant}/$info_for{$term}{expected} >= $FOLD_ENRICHMENT &&
+            $info_for{$term}{significant} >= $MIN_GENES ){
             print join("\t", $term, $info_for{$term}{description}, $info_for{$term}{pvalue},
                        $info_for{$term}{expected}, $info_for{$term}{significant},
                        $info_for{$term}{significant}/$info_for{$term}{expected}, ), "\n";
@@ -116,6 +118,8 @@ sub get_and_check_options {
         'enriched',
         'depleted',
         'sig_level=f',
+        'fold_enrichment=f',
+        'min_genes=i',
         'output_file=s',
         'help',
         'man',
@@ -140,6 +144,14 @@ sub get_and_check_options {
         ? $options{sig_level}
         : 0.05;
         
+    Readonly $FOLD_ENRICHMENT => defined $options{fold_enrichment}
+        ? $options{fold_enrichment}
+        : 1.5;
+    
+    Readonly $MIN_GENES => defined $options{min_genes}
+        ? $options{min_genes}
+        : 5;
+    
     if( !$options{output_file} ){
         my $dt = DateTime->now;
         $options{output_file} = join('.', $dt->ymd, 'GO', 'sig', 'yml');
@@ -171,6 +183,8 @@ enriched/depleted.
         --enriched              only consider terms that are enriched
         --depleted              only consider terms that are depleted
         --sig_level             significance level for reporting
+        --fold_enrichment       fold enrichment cut-off
+        --min_genes             minimum number of genes cut-off
         --output_file           name for the outputfile
         --help                  print this help message
         --man                   print the manual page
@@ -220,6 +234,16 @@ Default is both enrichment and depletion
 
 Only report term where the pvalue is below this level.
 Default = 0.05
+
+=item B<--fold_enrichment>
+
+Only report term where the fold enrichment is above this level.
+Default = 1.3
+
+=item B<--min_genes>
+
+Only report term where the number of observed genes annotated to the term is equal to or greater than this level.
+Default = 5
 
 =item B<--output_file>
 
