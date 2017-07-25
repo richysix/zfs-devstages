@@ -247,12 +247,12 @@ rnaseqQortsData.m$sampleType <- factor( rep('RNA-Seq', nrow(rnaseqQortsData.m) )
 # merge molten data and sample info
 rnaseqQortsData.stage.m <- merge(rnaseqQortsData.m, rnaseqSampleInfo)
 
-numGenesPlotRNAseq <- ggplot(data = rnaseqGDData, aes(x = stageName, y = genes, fill = stageName) ) +
-  geom_boxplot(outlier.shape=NA, size = 0.2 ) +
-  scale_fill_manual(values = colourPalette) +
-  labs(x="Stage", y=paste0("Genes Detected (>= ", rnaseqTpmThreshold, " TPM)") ) +
-  theme_minimal() +
-  theme( axis.text.x = element_text(colour = "black", angle = 90, vjust = 0.4, hjust = 1) )
+# numGenesPlotRNAseq <- ggplot(data = rnaseqGDData, aes(x = stageName, y = genes, fill = stageName) ) +
+#   geom_boxplot(outlier.shape=NA, size = 0.2 ) +
+#   scale_fill_manual(values = colourPalette) +
+#   labs(x="Stage", y=paste0("Genes Detected (>= ", rnaseqTpmThreshold, " TPM)") ) +
+#   theme_minimal() +
+#   theme( axis.text.x = element_text(colour = "black", angle = 90, vjust = 0.4, hjust = 1) )
 
 # box plot of just RNA-seq data
 readPairsBoxPlot <- ggplot(data = rnaseqQortsData.stage.m, aes(x = stageName, y = value) ) +
