@@ -4264,16 +4264,16 @@ detctDataFile <- file.path(rootPath, 'dataFiles', 'detct', 'DESeq.zfs.detct.grcz
 if( file.exists(detctDataFile) ){
   load(detctDataFile)
 } else {
-  dataFile <- file.path(rootPath, 'dataFiles', 'detct', 'zfs-detct-grcz10.tsv')
-  if( !file.exists(dataFile) ){
+  detct_dataFile <- file.path(rootPath, 'dataFiles', 'detct', 'zfs-detct-grcz10.tsv')
+  if( !file.exists(detct_dataFile) ){
     stop("DETCT counts data file is not present! Please download from figshare. See README.")
   }
-  detctData <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"",
+  detctData <- read.table(detct_dataFile, sep="\t", header=TRUE, quote = "\"",
                      comment.char = "%")
   rownames(detctData) <- paste(detctData[,1], detctData[,2], detctData[,3], detctData[,5], sep=":")
-  countData <- detctData[ , grepl("zmp.*count", colnames(detctData) ) &
-                            !grepl("normalised", colnames(detctData) ) ]
-  colnames(countData) <- gsub(".count", "", colnames(countData) )
+  detct_countData <- detctData[ , grepl("zmp.*count", colnames(detctData) ) &
+                                        !grepl("normalised", colnames(detctData) ) ]
+  colnames(detct_countData) <- gsub(".count", "", colnames(detct_countData) )
 
   # sample Info
   detctSampleInfoFile <- file.path(rootPath, 'dataFiles', 'detct', 'zfs-detct-sampleInfo.tsv')
@@ -4302,19 +4302,19 @@ if( file.exists(detctDataFile) ){
             levels = c("pre-ZGA", "Gastrula", "Somitogenesis", "Prim-stages", "2-5dpf") )
   
   # order by countData column names
-  detctSampleInfo <- detctSampleInfo[ colnames(countData), ]
+  detctSampleInfo <- detctSampleInfo[ colnames(detct_countData), ]
   # set levels of stageName
   detctSampleInfo$stageName <- factor( detctSampleInfo$stageName,
                                   levels = unique(detctSampleInfo$stageName) )
   # relabel colnames with sample names
-  colnames(countData) <- detctSampleInfo$sampleName
-  colnames(countData) <- 
-    gsub(" ", "-", colnames(countData))
+  colnames(detct_countData) <- detctSampleInfo$sampleName
+  colnames(detct_countData) <- 
+    gsub(" ", "-", colnames(detct_countData))
   # row names of sample info must match count data column names
   rownames(detctSampleInfo) <- detctSampleInfo$sampleName
   
   # make DESeq object and do vst transform
-  detctDESeqDataSet <- DESeqDataSetFromMatrix(countData, detctSampleInfo, design = ~ condition)
+  detctDESeqDataSet <- DESeqDataSetFromMatrix(detct_countData, detctSampleInfo, design = ~ condition)
   featureData <- detctData[ , !grepl("count", colnames(detctData)) | grepl("3..end.read.count", colnames(detctData)) ]
   mcols(detctDESeqDataSet) <- DataFrame(mcols(detctDESeqDataSet), 
                                         region = rownames(featureData),
@@ -4459,6 +4459,7 @@ dev.off()
 #### DETCT PCA
 
 ```{r detct_pca_all_regions}
+varRegionThreshold <- 0.01
 detctpcaObj <- runPCA( detctDESeqDataSet, detctDESeqDataSetVst, nrow(detctDESeqDataSetVst) )
 detctpcaPlotList <- detctpcaObj$plots
 detctPCDataList <- detctpcaObj$PCData
@@ -4471,6 +4472,8 @@ ggsave(file.path(rootPath, 'plots', 'Figure.1-4.pdf'),
 ```
 
 ```{r print_detct_pca, include=TRUE}
+pdf(file.path(rootPath, 'plots', 'Figure.1-4.pdf'), 
+       width = 20, height = 20)
 grid.newpage()
 grid.draw( 
   arrangeGrob( grobs = detctMatrixPlotList,
