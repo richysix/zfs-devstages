@@ -2138,7 +2138,7 @@ print(UnnamedStackedPC)
 
 #### Effect of Normalisation on cluster 11
 
-```{r normalisation_check, include=TRUE}
+```{r normalisation_check, include=TRUE, eval=FALSE}
 dataFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'spikes-counts.txt')
 spikesData <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"",
                          row.names = 1 )
@@ -2154,7 +2154,7 @@ spikesDESeqDataSet <- estimateSizeFactors(spikesDESeqDataSet)
 ddsSpikeNormalised <- dds
 sizeFactors(ddsSpikeNormalised) <- sizeFactors(spikesDESeqDataSet)
 
-cluster11tpm <- tpm[ rownames( clusterData[ clusterData$cluster == "Cluster011", ] ), ]
+cluster11tpm <- tpm[ rownames( cluster_data[ cluster_data$cluster == "Cluster011", ] ), ]
 # center and scale. scale works on columns. 
 # need to transpose, scale then transpose back to scale rows (genes).
 cluster11tpmScaled <- t( scale( t(cluster11tpm) ) )
@@ -2165,7 +2165,7 @@ cluster11tpmMeanByStage <- data.frame(
   Mean = colMeans(cluster11tpmScaled)
 )
 
-cluster11NormCounts <- counts(dds, normalized = TRUE )[ rownames( clusterData[ clusterData$cluster == "Cluster011", ] ), ]
+cluster11NormCounts <- counts(dds, normalized = TRUE )[ rownames( cluster_data[ cluster_data$cluster == "Cluster011", ] ), ]
 # center and scale. scale works on columns. 
 cluster11NormCountsScaled <- t( scale( t(cluster11NormCounts) ) )
 cluster11NormCountsMeanByStage <- data.frame(
@@ -2175,7 +2175,7 @@ cluster11NormCountsMeanByStage <- data.frame(
   Mean = colMeans(cluster11NormCountsScaled)
 )
 
-cluster11SpikeNormCounts <- counts(ddsSpikeNormalised, normalized = TRUE )[ rownames( clusterData[ clusterData$cluster == "Cluster011", ] ), ]
+cluster11SpikeNormCounts <- counts(ddsSpikeNormalised, normalized = TRUE )[ rownames( cluster_data[ cluster_data$cluster == "Cluster011", ] ), ]
 # center and scale. scale works on columns. 
 cluster11SpikeNormCountsScaled <- t( scale( t(cluster11SpikeNormCounts) ) )
 cluster11SpikeNormCountsMeanByStage <- data.frame(
