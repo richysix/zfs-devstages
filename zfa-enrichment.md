@@ -144,9 +144,10 @@ done
 
 ### Clusters with significant results
 ```bash
-# List of clusters with significant results
-wc -l $ZFA_DIR/0.94-e85/Cluster*/sig.tsv | perl -lane 'if($F[0] > 1){ print $F[1]}' | \
-sed -e 's|/sig\.tsv||; s|^.*/||' | grep -v total
+# List of clusters with significant results (excluding ZFA:0001093 - unspecified)
+find $ZFA_DIR/0.94-e85/Cluster*/ | grep sig.tsv$ | \
+xargs grep -cvE 'ZFA:0001093' | tr ':' '\t' | \
+perl -lane 'if($F[1] > 1){ print $F[0]}' | sed -e 's|/sig\.tsv||; s|^.*/||'
 Cluster001
 Cluster004
 Cluster005
@@ -156,7 +157,6 @@ Cluster013
 Cluster016
 Cluster018
 Cluster022
-Cluster025
 Cluster036
 Cluster041
 Cluster044
@@ -186,7 +186,7 @@ cd $cluster
 echo -e "ID\tp\tp.adjusted\tname\tTotalInTerm\tSignificant\tExpected" > sig.nums.tsv
 # variable for the size of this cluster
 clusterSize=$(cat sig-zfin-genes.txt | wc -l)
-for ZFAterm in $( grep ^ZFA sig.tsv | cut -f1 )
+for ZFAterm in $( grep ^ZFA sig.tsv | cut -f1 | grep -v 'ZFA:0001093')
 do
 # get all genes mapped to the ZFA term
 grep $ZFAterm $ZFA_DIR/annotations.txt | cut -f2 | sort -u > $ZFAterm.allGenes.tmp
@@ -252,4 +252,3 @@ do
 perl -F"\t" -lane 'if( $F[5] > $F[6] && $F[5]/$F[6] >= 1.3 ){ print join("\t", "'$cluster'", @F[0..4,6,5], sprintf("%.3f", $F[5]/$F[6]) ); }' $cluster/sig.nums.tsv >> zfa.e85.sig.tsv
 done
 ```
-
