@@ -4565,19 +4565,26 @@ meanData <- do.call(rbind,
 ```
 
 ```{r barPlot, include=TRUE}
+# colour palette
+end_colours <- colour_blind_palette[ c('blue', 'orange', 'blue_green') ]
+names(end_colours) <- levels(meanData$End)
+
 barPlot <- ggplot( data = meanData, aes( x = Stage, y = meanCounts, fill = End ) ) +
   geom_bar( stat="identity", position = "dodge" ) + 
   geom_errorbar( aes(ymin = lower, ymax = upper, colour = End ), position="dodge" ) +
   labs( y = "Mean Normalised Counts" ) + 
-  scale_fill_brewer(type="qual", palette = "Set2") +
-  scale_colour_brewer(type="qual", palette = "Set2") +
-  theme_minimal() + theme( axis.text.x = element_blank() )
+  scale_fill_manual(values = end_colours) +
+  scale_colour_manual(values = end_colours) +
+  theme_minimal() + theme( axis.text.x = element_blank(),
+                           axis.title = element_text(size = 14),
+                           axis.text.y = element_text(size = 12),
+                           legend.title = element_text(size = 14),
+                           legend.text = element_text(size = 12) )
 
-plotList <- add_to_plot_list( 
-  plotList,
-  barPlot,
-  file.path(rootPath, 'plots', 'Figure.6c.pdf')
-)
+postscript(file = file.path(rootPath, 'plots', 'Figure.8c.eps'),
+           width = 8, height = 6)
+print(barPlot)
+dev.off()
 
 print(barPlot)
 ```
