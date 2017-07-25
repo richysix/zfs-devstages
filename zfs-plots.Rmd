@@ -415,16 +415,30 @@ tpmFilt <- tpm[genesAboveThreshold, ]
 tpmAnno <- merge( mcols(dds), tpmFilt, 
                   by.x = c('e85.Ensembl.Gene.ID'),
                   by.y = 0 )
+rownames(tpmAnno) <- tpmAnno$e85.Ensembl.Gene.ID
+tpmAnno <- tpmAnno[ order(tpmAnno$Chr, tpmAnno$Start), ]
 outFilename <- file.path(rootPath, 'output', 'zfs-grcz10.tpm.tsv')
 write.table(tpmAnno, file = outFilename, quote = FALSE, sep = "\t",
             col.names = FALSE, row.names = FALSE)
+
+# make tpm matrix including every gene.
+# have NA for genes that do not have tpms due to transcript size
+tpmAll <- matrix(rep(NA, 2889450), nrow = 32105)
+genes_in_chr_order <- as.character( mcols(dds)[['e85.Ensembl.Gene.ID']][ order(mcols(dds)$Chr, mcols(dds)$Start) ] )
+rownames(tpmAll) <- genes_in_chr_order
+for( gene in genes_in_chr_order ){
+  if( any(rownames(tpm) == gene ) ){
+    tpmAll[gene,] <- tpm[gene,]
+  }
+}
+
 ```
 
 ### Fig. S1b
 
 #### Genes detected
 
-```{r genes_detected_plot, include=TRUE, eval=FALSE}
+```{r genes_detected_plot, include=TRUE}
 rnaseqTpmThreshold <- 1
 rnaseqGenesDetectedByStage <- apply(tpmFilt, 2, function(col){ sum(col >= rnaseqTpmThreshold) } )
 rnaseqGenesDetected.m <- melt(rnaseqGenesDetectedByStage)
@@ -883,9 +897,11 @@ numGenes <- 100
 medianPlotList <- vector('list', length = 6)
 for( PCNum in 1:6 ){
   dataForPC <- pcaObj$PCData[[PCNum]]
-  counts <- dataForPC[ seq_len(numGenes), ]
+  # counts <- dataForPC[ seq_len(numGenes), ]
+  pc_tpm <- tpmAll[ rownames(dataForPC), ]
 
-  Medians <- apply( counts, 2, median )
+  # Medians <- apply( counts, 2, median )
+  Medians <- apply( pc_tpm, 2, median, na.rm = TRUE )
   # scale by log10
   log10Median <- log10( Medians + 1 )
 
@@ -905,20 +921,21 @@ medianHeatmap <- ggplot(data = medianPlotData) +
   geom_hline( data = data.frame( y = seq(0.5,6.5,1) ), 
               aes( yintercept = y ), colour = "white" ) + 
   scale_fill_gradientn( colours = c("blue", "yellow", "red"), 
-                        guide = guide_colorbar(title = "log10\nmedian\ncounts") ) +
-  theme_void() + theme( legend.position="right",
-                        legend.title = element_text(colour = "black", angle = 0, debug = FALSE),
-                        axis.text.y =  element_text(colour="black", angle = 0, debug = FALSE ) )
+                        guide = guide_colorbar(title = "Average Expression\n(log10[TPM])") ) +
+  theme_void() + 
+  theme( legend.position="right",
+          legend.title = element_text(colour = "black", angle = 0, debug = FALSE, size = 6),
+          legend.text = element_text(colour = "black", angle = 0, debug = FALSE, size = 6),
+          axis.text.y =  element_text(colour="black", angle = 0, debug = FALSE ) )
 
 # print median plot including legend to have a copy of the legend
-plotList <- add_to_plot_list( plotList, 
-                              medianHeatmap, 
-                              file.path(rootPath, 'plots', 'Figure.1h.pdf') )
-
+postscript(file = file.path(rootPath, 'plots', 'Figure.1e.eps'),
+           width = 7, height = 4)
 print( medianHeatmap )
+dev.off()
 ```
 
-### Figure 1-2
+### Figure S2
 
 #### PCA Matrix Plot
 
@@ -1050,7 +1067,7 @@ profile_for_PC <- function( PCNum, PCDataList, tpms, numGenes = 100, size = 2 ){
 
 ```
 
-```{r pcaMatrixPlot}
+```{r pcaMatrixPlot_func}
 #' PCA_matrixPlot
 #' Plot a matrix of plots representing all the principal components
 #' 
