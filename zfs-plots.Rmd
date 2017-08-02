@@ -3836,12 +3836,35 @@ for( i in seq_len(length(plots)) ){
   plot_list <- plots[[i]]
   for( j in seq_len(length(plot_list)) ){
     plot <- plot_list[[j]]
-    pdf(file = file.path('plots', paste0('chr_expression_domains.chr', i, '.', j, '.eps')) )
+    postscript(file = file.path('plots', paste0('chr_expression_domains.chr', i, '.', j, '.eps')) )
     print(plot)
     dev.off()
   }
 }
 
+fig5_s1_plots <- list(
+  plots[[3]][[1]],
+  plots[[15]][[1]],
+  plots[[15]][[2]],
+  plots[[12]][[2]],
+  plots[[22]][[2]]
+)
+
+max_tpm_value <- ceiling( max( sapply(fig5_s1_plots, 
+                             function(x){
+                               max(x$data$Value)
+                             }) ) * 10 ) / 10
+
+for( i in seq_len(length(fig5_s1_plots))){
+  postscript(file = file.path('plots', paste0('chr_expression_domains.fig5-s1-',
+                                              letters[i], '.eps')),
+             width = 7, height = 5)
+  print(fig5_s1_plots[[i]] + 
+          scale_fill_gradientn(colours = c("blue", "yellow", "red"),
+                                 limits = c(0,max_tpm_value))
+          )
+  dev.off()
+}
 ```
 
 ```{bash}
