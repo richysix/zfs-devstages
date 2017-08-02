@@ -988,6 +988,47 @@ postscript(file = file.path(rootPath, 'plots', 'Figure.1e.eps'),
            width = 7, height = 4)
 print( medianHeatmap )
 dev.off()
+
+mean_scaled_data_list <- vector('list', length = 6)
+for( PCNum in 1:6 ){
+  dataForPC <- pcaObj$PCData[[PCNum]]
+  # counts <- dataForPC[ seq_len(numGenes), ]
+  pc_tpm <- tpmAll[ rownames(dataForPC), ]
+  pc_tpm <- pc_tpm[ !is.na(pc_tpm[,1]), ]
+
+  pc_tpm_scaled <- scale(t(pc_tpm))
+  pc_tpm_scaled_ByStageList <- split.data.frame(pc_tpm_scaled, rnaseqSampleInfo$stageName)
+  
+  pc_tpm_scaled_MeanBySample <- sapply(pc_tpm_scaled_ByStageList, rowMeans)
+  mean_tpm_scaled_MeanBySample <- melt(pc_tpm_scaled_MeanBySample)
+  mean_tpm_scaled_MeanBySample$Var1 <- rnaseqSampleInfo$sampleName
+  mean_tpm_scaled_MeanBySample$PC <- rep( paste0('PC', PCNum), nrow(mean_tpm_scaled_MeanBySample) )
+  
+  mean_scaled_data_list[[PCNum]] <- mean_tpm_scaled_MeanBySample
+}
+mean_scaled_PlotData <- do.call(rbind, mean_scaled_data_list)
+mean_scaled_PlotData$PC <- factor( mean_scaled_PlotData$PC,
+                             levels = paste0('PC', 6:1) )
+
+mean_scaled_pc_tpm_Heatmap <- ggplot(data = mean_scaled_PlotData) +
+  geom_tile( aes( x = Var1, y = PC, fill = value ),
+             colour = "grey60" ) + 
+  geom_hline( data = data.frame( y = seq(0.5,6.5,1) ), 
+              aes( yintercept = y ), colour = "white" ) + 
+  scale_fill_gradientn( colours = c("blue", "yellow", "red"), 
+                        guide = guide_colorbar(title = "Average\nExpression\n(mean TPM,\ncentred and scaled)") ) +
+  theme_void() + 
+  theme( legend.position="right",
+          legend.title = element_text(colour = "black", angle = 0, debug = FALSE, size = 12),
+          legend.text = element_text(colour = "black", angle = 0, debug = FALSE, size = 12),
+          axis.text.y =  element_text(colour = "black", angle = 0, debug = FALSE, size = 12 ) )
+
+# print plot to eps
+postscript(file = file.path(rootPath, 'plots', 'Figure.1e.scaled.eps'),
+           width = 8, height = 3)
+print( mean_scaled_pc_tpm_Heatmap )
+dev.off()
+
 ```
 
 ### Figure S2
