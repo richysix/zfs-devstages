@@ -3979,7 +3979,6 @@ expr_data <- tpmFilt
 # expr_data <- counts(dds, normalized = TRUE )
 # rownames(expr_data) <- mcols(dds)[ , geneIdColumnName ]
 # # remove rows that are all zeros
-expr_data <- expr_data[ rowSums(expr_data) > 0, ]
 geneCor <- cor(t(expr_data))
 
 # for each combination of genes get the correlation coefficient
