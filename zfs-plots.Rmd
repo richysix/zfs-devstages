@@ -4681,18 +4681,29 @@ dev.off()
 ```{r detct_pca_all_regions}
 varRegionThreshold <- 0.01
 detctpcaObj <- runPCA( detctDESeqDataSet, detctDESeqDataSetVst, nrow(detctDESeqDataSetVst) )
-detctpcaPlotList <- detctpcaObj$plots
+```
+
+```{bash organise_dir}
+mkdir output/pca/detct
+mv output/pca/PC* output/pca/detct/
+# edit files to replace gene+id in header with region
+for file in $( find output/pca/detct | grep tsv$ )
+do
+sed -i '.tmp' -e 's|gene_id|region|' $file
+done
+rm output/pca/detct/*.tmp
+```
+
+```{r detct_pca_matrix_plot}
 detctPCDataList <- detctpcaObj$PCData
 detctMatrixPlotList <- PCA_matrixPlot( detctPCDataList, detctpcaObj$pca, 
                                        detctDESeqDataSetVst, numGenes = 100 )
-
-ggsave(file.path(rootPath, 'plots', 'Figure.1-4.pdf'), 
-       width = 20, height = 20, 
-       marrangeGrob(detctMatrixPlotList, nrow = 6, ncol = 6) )
 ```
 
 ```{r print_detct_pca, include=TRUE}
 pdf(file.path(rootPath, 'plots', 'Figure.1-4.pdf'), 
+       width = 20, height = 20)
+postscript(file.path(rootPath, 'plots', 'Figure.1-4.eps'), 
        width = 20, height = 20)
 grid.newpage()
 grid.draw( 
@@ -4714,7 +4725,7 @@ table( mcols(detctDESeqDataSet)[['e86.Ensembl.Gene.ID']] )
 # see how well they overlap with rnaseq lists
 overlaps <- numeric(length = length(PCDataList))
 for( PCNum in seq_len(length(PCDataList))){
-  rnaseq_gene_list <- rownames(PCDataList[[PCNum]])
+  rnaseq_gene_list <- rownames(pcaObj$PCData[[PCNum]])
   # build look-up table
   genes_ids_in_pc <- new.env()
   for( gene in rnaseq_gene_list ){
