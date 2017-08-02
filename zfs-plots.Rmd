@@ -2568,13 +2568,23 @@ znf_clusters_chr4_pfam <- znf_clusters_Pfam[ znf_clusters_Pfam$chr == '4', ]
 
 # get pfam ids for zinc finger
 pfam2desc <- unique(znf_clusters_chr4_pfam[c('pfam', 'pfamDescription')])
-znf_pfam_ids <- pfam2desc$pfam[ grepl('[Zz]inc finger', pfam2desc$pfamDescription) ]
+znf_pfam_ids <- pfam2desc$pfam[ grepl('[Zz]inc.finger', pfam2desc$pfamDescription) ]
 # subset to genes with zinc finger domain and count them
 znf_clusters_chr4_znf_domain <- do.call(c, lapply(znf_pfam_ids, function(x){ as.character( znf_clusters_chr4_pfam$gene_id[ znf_clusters_chr4_pfam$pfam == x ] ) }) )
 
 # number of genes with a ZnF domain
 length(unique(znf_clusters_chr4_znf_domain))
 # 153
+
+znf_clusters_chr4_pfam <- znf_clusters_chr4_pfam[ 
+  order(znf_clusters_chr4_pfam$start, znf_clusters_chr4_pfam$pfam), ]
+
+# output for supplementary file
+write.table(znf_clusters_chr4_pfam,
+            file = file.path(rootPath, 'output', 'chr4_znf_Pfam.tsv'),
+            sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+
+
 ```
 
 ```{r chr4_ZnF, include=TRUE}
@@ -2819,7 +2829,7 @@ names(cluster_colour_palette) <- names(table(chr4ClusterData$cluster))[ table(ch
 ```
 
 ```{r znf_log10TPM_heatmap, include=TRUE}
-# get TPMs for just ZnFs from clusters 4, 22, 37 and 84
+# get TPMs for just ZnFs from clusters 7, 23, 26 and 135
 znf_cluster_numbers <- c(7,23,26,135)
 clusterNames <- sprintf("Cluster%03d", znf_cluster_numbers)
 znf_cluster_ZnFsList <- lapply(as.list(clusterNames), 
