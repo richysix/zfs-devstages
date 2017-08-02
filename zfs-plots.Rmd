@@ -4787,50 +4787,60 @@ dev.off()
 ### e90 new genes
 
 ```{r new_genes}
-dataFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'zfs-rnaseq-grcz10.90.tsv')
-if( !file.exists(dataFile) ){
-  stop("RNA-seq counts data file is not present! Please download from figshare. See README.")
-}
-rnaseqData_90 <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"")
-# data contains a gene id column and then a column of counts for each sample
-countData_90 <- rnaseqData_90[ , -1 ]
-rownames(countData_90) <- rnaseqData_90[[1]]
+dataFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'zfs-rnaseq-grcz10.e90.tpm.genes.tsv')
+tpm_e90 <- read.table(dataFile, header = TRUE, sep ="\t", quote = "\"")
 
-# sample info is the same, rnaseqSampleInfo already exists
-# order count data in stage order
-colorder <- sapply( rnaseqSampleInfo$sample, 
-                    function(x){ which( colnames(countData_90) == x ) } )
-countData_90 <- countData_90[ , colorder ]
+tpm_e90_mat <- as.matrix(tpm_e90[,2:91])
+rownames(tpm_e90_mat) <- as.character(tpm_e90[[1]])
+colnames(tpm_e90_mat) <- as.character(rnaseqSampleInfo$sampleName)
 
-# relabel colnames with sample names
-colnames(countData_90) <- rownames(rnaseqSampleInfo)
 
-# make DESeq object and do rlog transform
-dds_90 <- DESeqDataSetFromMatrix(countData_90, rnaseqSampleInfo, design = ~ condition)
 
-# # add metadata
-# featureData <- rnaseqData_90[ , !grepl("count", colnames(rnaseqData_90) ) ]
-# mcols(dds) <- DataFrame(mcols(dds), featureData)
-
-dds_90 <- estimateSizeFactors(dds_90)
-# dds_90_Rlog <- rlogTransformation(dds_90, blind=TRUE)
-
-# save objects to file for reloading
-# save(rnaseqData_90, countData_90, rnaseqSampleInfo, dds_90, dds_90_Rlog, file=DeseqDataFile)
+# dataFiles/rnaseq/zfs-rnaseq-grcz10.e90.tpm.genes.tsv
+# 
+# if( !file.exists(dataFile) ){
+#   stop("RNA-seq counts data file is not present! Please download from figshare. See README.")
+# }
+# rnaseqData_90 <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"")
+# # data contains a gene id column and then a column of counts for each sample
+# countData_90 <- rnaseqData_90[ , -1 ]
+# rownames(countData_90) <- rnaseqData_90[[1]]
+# 
+# # sample info is the same, rnaseqSampleInfo already exists
+# # order count data in stage order
+# colorder <- sapply( rnaseqSampleInfo$sample, 
+#                     function(x){ which( colnames(countData_90) == x ) } )
+# countData_90 <- countData_90[ , colorder ]
+# 
+# # relabel colnames with sample names
+# colnames(countData_90) <- rownames(rnaseqSampleInfo)
+# 
+# # make DESeq object and do rlog transform
+# dds_90 <- DESeqDataSetFromMatrix(countData_90, rnaseqSampleInfo, design = ~ condition)
+# 
+# # # add metadata
+# # featureData <- rnaseqData_90[ , !grepl("count", colnames(rnaseqData_90) ) ]
+# # mcols(dds) <- DataFrame(mcols(dds), featureData)
+# 
+# dds_90 <- estimateSizeFactors(dds_90)
+# # dds_90_Rlog <- rlogTransformation(dds_90, blind=TRUE)
+# 
+# # save objects to file for reloading
+# # save(rnaseqData_90, countData_90, rnaseqSampleInfo, dds_90, dds_90_Rlog, file=DeseqDataFile)
 ```
 
 ```{r new_genes_counts_heatmap, include = TRUE}
 new_gene_file <- file.path(rootPath, 'dataFiles', 'new_genes.90.txt')
 new_genes <- read.table(file = new_gene_file, sep = "\t", header = FALSE,
                         colClasses = c('character'))
-new_genes_counts <- counts(dds_90, normalized = TRUE)[ new_genes[[1]], ]
+new_genes_tpm <- tpm_e90_mat[ as.character(new_genes[[1]]), ]
 
-new_genes_info <- cluster_and_plot_tpms(log10(new_genes_counts + 1))
+new_genes_info <- cluster_and_plot_tpms(log10(new_genes_tpm + 1))
 
 pdf(file = file.path(rootPath, 'plots', 'e90.new_genes.log10.heatmap.pdf'))
 new_genes_info$plot + 
   scale_fill_gradientn( colours = c("blue", "yellow", "red"),
-                        guide = guide_colorbar(title = expression(paste(log[10], "(normalised counts)", sep = '') ) ) ) +
+                        guide = guide_colorbar(title = expression(paste(log[10], "[TPM]", sep = '') ) ) ) +
   theme(legend.position="right")
 dev.off()
 
@@ -4841,6 +4851,44 @@ grid.draw(
   arrangeGrob( grobs = list( new_genes_info$plot +
                                theme(legend.position="none"),
                              sampleStrip ),
+               ncol = 1,
+               heights = c(0.95,0.05)
+  )
+)
+dev.off()
+
+
+pdf(file = file.path(rootPath, 'plots', 'e90.new_genes.log10.tpm.heatmap.pdf'))
+grid.newpage()
+grid.draw( 
+  arrangeGrob( grobs = list( new_genes_info$plot + 
+                               scale_fill_gradientn( colours = c("blue", "yellow", "red"),
+                                    guide = guide_colorbar(title = expression(paste(log[10], "(TPM)", sep = '') ) ) ) +
+                               theme(legend.position="right"),
+                             sampleStrip + theme( plot.margin = unit(c(0,0.146,0,0), unit = 'npc') ) ),
+               ncol = 1,
+               heights = c(0.95,0.05)
+  )
+)
+dev.off()
+
+new_lincs_file <- file.path(rootPath, 'dataFiles', 'new_genes.linc.90.txt')
+new_lincs <- read.table(file = new_lincs_file, sep = "\t", header = FALSE,
+                        colClasses = c('character'))
+new_lincs_tpm <- tpm_e90_mat[ as.character(new_lincs[[1]]), ]
+# rmove lines with 0 sd
+new_lincs_tpm <- new_lincs_tpm[ rowSds(new_lincs_tpm) != 0, ]
+
+new_lincs_info <- cluster_and_plot_tpms(log10(new_lincs_tpm + 1))
+
+pdf(file = file.path(rootPath, 'plots', 'e90.new_lincRNAs.log10.tpm.heatmap.sample_strip.pdf'))
+grid.newpage()
+grid.draw( 
+  arrangeGrob( grobs = list( new_lincs_info$plot + 
+                               scale_fill_gradientn( colours = c("blue", "yellow", "red"),
+                                    guide = guide_colorbar(title = expression(paste(log[10], "(TPM)", sep = '') ) ) ) +
+                               theme(legend.position="right"),
+                             sampleStrip + theme( plot.margin = unit(c(0,0.146,0,0), unit = 'npc') ) ),
                ncol = 1,
                heights = c(0.95,0.05)
   )
