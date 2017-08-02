@@ -4676,67 +4676,110 @@ if( nrow(sig_results) > 0 ){
 ### differential transcript usage
 
 ```{r diff_isoforms, include = TRUE}
-counts_by_transcripts_file <- file.path(rootPath, 'dataFiles', 'rnaseq', 'zfs-rnaseq-grcz10.det-transcript-counts.tsv')
-counts_by_transcripts <- read.table(counts_by_transcripts_file, sep = "\t", header = TRUE)
+differential_isoform_plot <- function( gene_id, tpm_by_transcripts, colour_palette ){
+  tpm_by_transcripts_subset <- tpm_by_transcripts[ tpm_by_transcripts$gene_id == gene_id, ]
+  tpm_by_transcripts_subset$transcript_id <- 
+    factor(tpm_by_transcripts_subset$transcript_id,
+           levels = unique(tpm_by_transcripts_subset$transcript_id) )
+  
+  tpm_by_transcripts_subset.m <- melt(tpm_by_transcripts_subset,
+                                        id.vars = c('transcript_id', 'gene_id'), 
+                                        variable.name = 'sample', 
+                                        value.name = 'norm_counts')
+  tpm_by_transcripts_subset_list <- split(tpm_by_transcripts_subset.m, tpm_by_transcripts_subset.m$sample)
+  tpm_by_transcripts_subset.m <- do.call(rbind,
+                                            lapply(names(tpm_by_transcripts_subset_list),
+                                                   function(sample, rnaseqSampleInfo){
+                                                     counts <- tpm_by_transcripts_subset_list[[sample]]
+                                                     numRows <- nrow(counts)
+                                                     sampleL <- rnaseqSampleInfo$sampleName == sample
+                                                     data.frame(
+                                                       counts,
+                                                       sampleName = rep(rnaseqSampleInfo$sampleName[ sampleL ], numRows),
+                                                       stageName = rep(rnaseqSampleInfo$stageName[ sampleL ], numRows),
+                                                       stageGroup = rep(rnaseqSampleInfo$stageGroup[ sampleL ], numRows)
+                                                     )
+                                                   }, rnaseqSampleInfo 
+                                            ) )
+  
+  # calculate mean per stage
+  counts <- tpm_by_transcripts_subset[, 3:92]
+  rownames(counts) <- as.character(tpm_by_transcripts_subset[, 'transcript_id'])
+  counts_by_stage <- split.data.frame(t(counts), rnaseqSampleInfo$stageName)
+  counts_by_transcript_by_stage <- do.call(cbind,
+                                           lapply(names(counts_by_stage),
+                                                  function(x){ 
+                                                    counts <- counts_by_stage[[x]]
+                                                    mean <- data.frame(colMeans(counts))
+                                                    colnames(mean) <- x
+                                                    return(mean)
+                                                  } )
+  )
+  counts_by_transcript_by_stage.m <- melt(as.matrix(counts_by_transcript_by_stage))
+  colnames(counts_by_transcript_by_stage.m) <- c('transcript_id', 'stageName', 'mean_counts')
+  
+  num_transcripts <- nlevels(tpm_by_transcripts_subset.m$transcript_id)
+  if( num_transcripts > length(colour_palette) ){
+    line_colours <- rep(colour_palette, 3)[seq_len(num_transcripts)]
+  } else {
+    line_colours <- colour_palette[seq_len(num_transcripts)]
+  }
+  names(line_colours) <- unique(tpm_by_transcripts_subset.m$transcript_id)
+  
+  diff_isoform_plot <- ggplot(data = tpm_by_transcripts_subset.m) + 
+    geom_point( aes(x = stageName, y = norm_counts, colour = transcript_id), shape = 21 ) + 
+    geom_line(data = counts_by_transcript_by_stage.m, 
+              aes(x = stageName, y = mean_counts, colour = transcript_id, group = transcript_id) ) +
+    scale_colour_manual(values = line_colours, 
+                        guide = guide_legend(title = 'Transcript' ) ) +
+    labs(x = 'Stage', y = 'Expression (TPM)', title = gene_id) +
+    theme_minimal() + theme( axis.text.x = element_text(angle = 90, hjust = 1) )
+  return(diff_isoform_plot)
+}
 
-counts_by_transcripts_rab41 <- counts_by_transcripts[ counts_by_transcripts$gene_id == 'ENSDARG00000029885', ]
+tpm_by_transcripts_file <- file.path(rootPath, 'dataFiles', 'rnaseq', 'zfs-rnaseq-grcz10.det-transcript-tpm.tsv')
+tpm_by_transcripts <- read.table(tpm_by_transcripts_file, sep = "\t", header = TRUE)
+colnames(tpm_by_transcripts) <- c('transcript_id', 'gene_id', as.character(rnaseqSampleInfo$sampleName) )
 
-counts_by_transcripts_rab41.m <- melt(counts_by_transcripts_rab41,
-                                      id.vars = c('transcript_id', 'gene_id'), 
-                                      variable.name = 'sample', value.name = 'norm_counts')
-counts_by_transcripts_rab41_list <- split(counts_by_transcripts_rab41.m, counts_by_transcripts_rab41.m$sample)
-counts_by_transcripts_rab41.m <- do.call(rbind,
-                                   lapply(names(counts_by_transcripts_rab41_list),
-                                     function(sample, rnaseqSampleInfo){
-                                       counts <- counts_by_transcripts_rab41_list[[sample]]
-                                       numRows <- nrow(counts)
-                                       sampleL <- rnaseqSampleInfo$sample == sample
-                                       data.frame(
-                                         counts,
-                                         sampleName = rep(rnaseqSampleInfo$sampleName[ sampleL ], numRows),
-                                         stageName = rep(rnaseqSampleInfo$stageName[ sampleL ], numRows),
-                                         stageGroup = rep(rnaseqSampleInfo$stageGroup[ sampleL ], numRows)
-                                       )
-                                     }, rnaseqSampleInfo 
-  ) )
+colour_palette <- colour_blind_palette[c('blue', 'vermillion', 'blue_green', 'sky_blue', 'black', 'purple', 'orange', 'yellow')]
 
-# calculate mean per stage
-counts <- counts_by_transcripts_rab41[, 3:92]
-rownames(counts) <- as.character(counts_by_transcripts_rab41[, 'transcript_id'])
-counts_by_stage <- split.data.frame(t(counts), rnaseqSampleInfo$stageName)
-counts_by_transcript_by_stage <- do.call(cbind,
-  lapply(names(counts_by_stage),
-         function(x){ 
-           counts <- counts_by_stage[[x]]
-           mean <- data.frame(colMeans(counts))
-           colnames(mean) <- x
-           return(mean)
-         } )
-)
-counts_by_transcript_by_stage.m <- melt(as.matrix(counts_by_transcript_by_stage))
-colnames(counts_by_transcript_by_stage.m) <- c('transcript_id', 'stageName', 'mean_counts')
-
-# plot for rab41 (ENSDARG00000029885)
-line_colours <- colour_blind_palette[c('blue', 'vermillion', 'blue_green')]
-names(line_colours) <- unique(counts_by_transcripts_rab41.m$transcript_id)
-
-rab41_diff_isoform_plot <- ggplot(data = counts_by_transcripts_rab41.m) + 
-  geom_point( aes(x = stageName, y = norm_counts, colour = transcript_id) ) + 
-  geom_line(data = counts_by_transcript_by_stage.m, 
-            aes(x = stageName, y = mean_counts, colour = transcript_id, group = transcript_id) ) +
-  scale_colour_manual(values = line_colours, guide = guide_legend(title = 'Transcript')) +
-  labs(x = 'Stage', y = 'Normalised Counts') +
-  theme_minimal() + theme( axis.text.x = element_blank(),
-                           axis.title = element_text(size = 7),
-                           axis.text.y = element_text(size = 6),
-                           legend.title = element_text(size = 7),
-                           legend.text = element_text(size = 6),
-                           legend.position=c(0.85, 0.85),
-                           legend.background = element_rect(fill = 'white'))
+rab41_diff_isoform_plot <- differential_isoform_plot( 'ENSDARG00000029885', tpm_by_transcripts, colour_palette )
 
 postscript(file = file.path(rootPath, 'plots', 'rab41.diff-isoform.eps'),
            width = 5, height = 3.5)
-print(rab41_diff_isoform_plot)
+print(rab41_diff_isoform_plot +
+        theme( plot.title = element_blank(),
+               axis.text.x = element_blank(),
+               axis.title = element_text(size = 7),
+               axis.text.y = element_text(size = 6),
+               legend.title = element_text(size = 7),
+               legend.text = element_text(size = 6),
+               legend.position=c(0.85, 0.85),
+               legend.background = element_rect(fill = 'white'))
+)
+dev.off()
+
+diff_iso_plot_list <- lapply(as.character(levels(tpm_by_transcripts$gene_id)),
+                             differential_isoform_plot,
+                             tpm_by_transcripts, colour_palette )
+pdf(file.path(rootPath, 'plots', 'diff-isoform.pdf'))
+print(diff_iso_plot_list)
+dev.off()
+
+# histogram
+isoform_counts <- as.data.frame(table(tpm_by_transcripts$gene_id))
+xmax <- max(as.integer(names(table(isoform_counts$Freq))))+1
+isoform_hist <- ggplot(data = isoform_counts) + 
+  geom_histogram( aes( x = Freq ), binwidth = 1 ) + 
+  labs(x = 'Number of isoforms', y = 'Frequency') + 
+  xlim(0,xmax) + 
+  theme_minimal() + 
+  theme( axis.text = element_text(size = 12),
+         axis.title = element_text(size = 14) )
+
+postscript(file = file.path(rootPath, 'plots', 'fig7d.eps'),
+           width = 7, height = 7)
+print(isoform_hist)
 dev.off()
 
 ```
