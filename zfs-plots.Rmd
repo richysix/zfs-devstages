@@ -421,7 +421,7 @@ rownames(tpmAnno) <- tpmAnno$e85.Ensembl.Gene.ID
 tpmAnno <- tpmAnno[ order(tpmAnno$Chr, tpmAnno$Start), ]
 outFilename <- file.path(rootPath, 'output', 'zfs-grcz10.tpm.tsv')
 write.table(tpmAnno, file = outFilename, quote = FALSE, sep = "\t",
-            col.names = FALSE, row.names = FALSE)
+            col.names = TRUE, row.names = FALSE)
 
 # make tpm matrix including every gene.
 # have NA for genes that do not have tpms due to transcript size
