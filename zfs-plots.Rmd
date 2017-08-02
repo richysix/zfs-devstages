@@ -4867,6 +4867,24 @@ output/topgo/mult-ends/stricter-mult-ends.$ontology.topGO.tsv \
 dataFiles/1551_ENSG.txt > output/topgo/mult-ends/stricter-mult-ends.$ontology.enriched-GO.tsv
 done
 
+# concatenate results
+perl -le 'print join("\t", qw{Stage GO.ID Term Domain Expected Observed pvalue FoldEnrichment});' \
+ > output/topgo/mult-ends/topGOResults.sig.tsv
+for ontology in BP CC MF
+do
+perl -F"\t" -lane 'BEGIN{
+  %domain_for = (
+    BP => "biological_process",
+    MF => "molecular_function",
+    CC => "cellular_component",
+  );
+}
+{$domain = $domain_for{"'$ontology'"};
+print join("\t", "stricter_3_ends", @F[0,1], $domain, @F[3,4,2,5]);
+}' \
+output/topgo/mult-ends/stricter-mult-ends.$ontology.enriched-GO.tsv
+done >> output/topgo/mult-ends/topGOResults.sig.tsv
+
 ```
 
 ```{r pfam_domains}
