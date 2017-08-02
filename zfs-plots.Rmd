@@ -822,13 +822,26 @@ runPCA <- function( DESeqObj, DESeqTransObj, regionCount ){
   # Output regions contributing most to each PC
   # data <- as.data.frame(counts(DESeqObj, normalized=TRUE))
   data <- as.data.frame(counts(DESeqObj, normalized=FALSE))
+  genes_for_pc <- data.frame(
+    gene_id = rownames(data),
+    gene_name = mcols(DESeqObj)[['Gene.name']]
+  )
+  genes_for_pc <- genes_for_pc[ select, ]
   genesForPCsList <- vector('list', length = sum(propVarPC * 100 >= varPCThreshold))
   for (i in seq.int(sum(propVarPC * 100 >= varPCThreshold))) {
-      data[select, "% variance explained"] <- propVarRegion[,i] * 100
-      # order genes by amount of variance explained
-      topData <- data[order(data$`% variance explained`, decreasing=TRUE),]
-      topData <- topData[ topData[["% variance explained"]] >= varRegionThreshold, ]
-      genesForPCsList[[i]] <- topData[ , !grepl('variance explained', colnames(data) ) ]
+    genes_for_pc[["% variance explained"]] <- propVarRegion[,i] * 100
+    genes_for_pc_tmp <- genes_for_pc[order(genes_for_pc$`% variance explained`, decreasing=TRUE),]
+    genes_for_pc_tmp <- genes_for_pc_tmp[ genes_for_pc_tmp[["% variance explained"]] >= varRegionThreshold, ]
+    # output gene list with contribution
+    write.table(genes_for_pc_tmp, 
+                file.path(rootPath, 'output', 'pca', paste0('PC', i, '.genes.tsv') ),
+                row.names = FALSE, col.names = TRUE, sep = "\t", quote = FALSE)
+    
+    data[select, "% variance explained"] <- propVarRegion[,i] * 100
+    # order genes by amount of variance explained
+    topData <- data[order(data$`% variance explained`, decreasing=TRUE),]
+    topData <- topData[ topData[["% variance explained"]] >= varRegionThreshold, ]
+    genesForPCsList[[i]] <- topData[ , !grepl('variance explained', colnames(data) ) ]
   }
 
   # Plot PCs in pairs
@@ -859,6 +872,11 @@ regionCount <- nrow(rnaseqData)
 pcaObj <- runPCA( dds, ddsRlog, regionCount )
 pcaPlotList <- pcaObj$plots
 
+```
+
+```{bash organise_dir}
+mkdir output/pca/rnaseq
+mv output/pca/PC* output/pca/rnaseq/
 ```
 
 #### PCA Plots (using all genes)
