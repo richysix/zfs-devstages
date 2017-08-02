@@ -2142,10 +2142,33 @@ biolayout_zfa_data <- read.table(zfa_file, sep = "\t", header=TRUE, quote = "\""
 
 #### Orthologues of Named/Unnamed genes
 
+```{bash, eval=FALSE}
+perl ~/checkouts/team31/scripts/count_orthologues.pl \
+--species_list species_list.txt \
+genes.orthologues.tsv > output/orthologue_counts.bystage.tsv
+
+# join to annotation and class as named or unnamed
+sort -t$'\t' -k1,1 output/orthologue_counts.bystage.tsv | \
+join -t$'\t' - dataFiles/annotation.txt | perl -F"\t" -lane '
+my @patterns = (
+  "^[A-Z][A-Z][0-9]{6}\.[0-9]+\$",
+  "^CABZ[0-9]{8}\.[0-9]+\$",
+  "^im:[0-9]{7}\$",
+  "^si:.*\$",
+  "^wu:.*\$",
+  "^zgc:[0-9]{5,6}\$"
+);
+my $named = 1;
+foreach my $pattern ( @patterns ){ if( $F[10] =~ m/$pattern/ ){ $named = 0; } }
+print join("\t", @F[0..4,10], $named ? "Named" : "Unnamed" );' > output/orthologue_counts.tsv
+
+```
+
 ##### Named Genes
+
 ```{r plot_orthologue_counts, include=TRUE}
 # load data
-orthologueCountFile <- file.path(rootPath, 'dataFiles', 'orthologue_counts.tsv')
+orthologueCountFile <- file.path(rootPath, 'output', 'orthologue_counts.tsv')
 orthologueCounts <- read.table(orthologueCountFile, header=FALSE,
                                sep="\t", col.names = c("geneId", "orthologueId", "species",
                                                        "lastCommonAncestor", "stage", "geneName",
