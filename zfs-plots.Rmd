@@ -693,6 +693,34 @@ pdf(file.path(rootPath, 'plots', 'samplecor.pearson.noENSDARG00000080337.pdf'))
 print(pearson_noMTHeatmap)
 dev.off()
 
+prefix <- file.path(rootPath, 'plots', 'RNAseq_pearson_cor_outliers.')
+file_num <- 1
+for(sample_1 in c('1-cell-1') ){
+  for(sample_2 in c('1-cell-2', 'Long-pec-5', 'Protruding-mouth-1',
+             'Day-4-1', 'Day-5-1') ){
+      # sample_1 <- sample_names[i]
+      # sample_2 <- sample_names[j]
+      plot_data <- data.frame(
+        gene_id = row.names(tpmFilt),
+        tpm_y = tpmFilt[, sample_1],
+        tpm_x = tpmFilt[, sample_2]
+      )
+      png(filename = paste0(prefix, file_num, '.png'))
+      print( 
+        ggplot(data = plot_data, aes(x = tpm_x, y = tpm_y)) + geom_point() +
+          labs(x = sample_2, y = sample_1, title = paste0(sample_1, ' vs ', sample_2) ) + 
+          lims(x = c(0,260000), y = c(0,260000))
+        )
+      dev.off()
+      file_num <- file_num + 1
+    }
+  }
+}
+
+png(filename = paste0(prefix, file_num, '.png'))
+print(pearson_noMTHeatmap + labs(title = 'Pearson Correlation Matrix after removing ENSDARG00000080337'))
+dev.off()
+
 ```
 
 ### Fig 1d
