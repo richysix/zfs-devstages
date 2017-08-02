@@ -1905,28 +1905,6 @@ output/topgo/maxByStage/$stage.gene-list.tsv > output/topgo/maxByStage/$stage.$o
 done
 done
 
-# concatenate results
-perl -le 'print join("\t", qw{Stage GO.ID Term Domain Expected Observed pvalue FoldEnrichment});' \
- > output/topgo/maxByStage/topGOResults.sig.tsv
-for stage in $( cut -f6 dataFiles/rnaseq/zfs-rnaseq-sampleInfo.tsv | \
-uniq | grep -v stageName | sed -e 's|%|pc|')
-do
-for ontology in BP CC MF
-do
-perl -F"\t" -lane 'BEGIN{
-  %domain_for = (
-    BP => "biological_process",
-    MF => "molecular_function",
-    CC => "cellular_component",
-  );
-}
-{$domain = $domain_for{"'$ontology'"};
-print join("\t", "'$stage'", @F[0,1], $domain, @F[3,4,2,5]);
-}' \
-output/topgo/maxByStage/$stage.$ontology.enriched-GO.tsv 
-done
-done >> output/topgo/maxByStage/topGOResults.sig.tsv
-
 ```
 
 ### Undetected genes
@@ -1944,8 +1922,61 @@ for( ontologyClass in c('BP', 'MF', 'CC') ){
              'maxByStage',
              paste('undetected', ontologyClass, 'topGO', sep='.')
            )
-  sigRes <- runTopGO( undetectedGenes, ontologyClass, allGenes, outputPrefix , sigLevel )
+  sigRes <- runTopGO( undetectedGenes, ontologyClass, allGenes, outputPrefix )
 }
+
+geneInfo <- data.frame(
+  name = geneNames[undetectedGenes], 
+  gene_id = undetectedGenes
+)
+gene_file_name <- file.path(
+  rootPath,
+  'output',
+  'topgo',
+  'maxByStage',
+  paste0('undetected', '.gene-list.tsv')
+)
+write.table(geneInfo, file=gene_file_name,
+            quote=FALSE, row.names=FALSE, col.names=FALSE, sep="\t")
+
+```
+
+```{bash parse_GO_undetected, eval=FALSE}
+# Run parse_GO script on undetected GO output
+for ontology in BP CC MF
+do
+for stage in undetected
+do
+perl ./parse_GO_results.pl \
+--enriched --sig_level 0.05 \
+--fold_enrichment 1.3 --min_genes 5 \
+--output_file output/topgo/maxByStage/$stage.$ontology.topGO.sig.tsv \
+output/topgo/maxByStage/$stage.$ontology.topGO.tsv \
+output/topgo/maxByStage/$stage.gene-list.tsv > output/topgo/maxByStage/$stage.$ontology.enriched-GO.tsv
+done
+done
+
+# concatenate results
+perl -le 'print join("\t", qw{Stage GO.ID Term Domain Expected Observed pvalue FoldEnrichment});' \
+ > output/topgo/maxByStage/topGOResults.sig.tsv
+for stage in $( cut -f6 dataFiles/rnaseq/zfs-rnaseq-sampleInfo.tsv | \
+uniq | grep -v stageName | sed -e 's|%|pc|') undetected
+do
+for ontology in BP CC MF
+do
+perl -F"\t" -lane 'BEGIN{
+  %domain_for = (
+    BP => "biological_process",
+    MF => "molecular_function",
+    CC => "cellular_component",
+  );
+}
+{$domain = $domain_for{"'$ontology'"};
+print join("\t", "'$stage'", @F[0,1], $domain, @F[3,4,2,5]);
+}' \
+output/topgo/maxByStage/$stage.$ontology.enriched-GO.tsv 
+done
+done >> output/topgo/maxByStage/topGOResults.sig.tsv
 
 ```
 
