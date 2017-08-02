@@ -1730,15 +1730,15 @@ print(pvalueCombinedHeatmap)
 dev.off()
 ```
 
-```{r goEnrichment, eval=FALSE}
+```{r goEnrichment}
 # do Go enrichment on genes assigned to each stage by max mean expression
 
 # # function to return sig genes by 'pvalue'
-# sigLevel <- 0.05
 # topDiffGenes <- function(allScore) {
 #   return(allScore < sigLevel)
 # }
 
+sigLevel <- 0.05
 code2ontology <- list(
   "BP" = 'biological_process',
   "CC" = 'cellular_component',
@@ -1814,28 +1814,6 @@ runTopGO <- function( gene_list, ontologyClass, allGenes, outputPrefix = 'topGO'
   
   return(sigRes)
 }
-```
-
-```{r run_GO, include=TRUE}
-allGenes <- do.call(c, lapply(tpmByStage, function(x){ colnames(x) } ) )
-for( ontologyClass in c('BP', 'MF', 'CC') ){
-  lapply(seq_len(length(tpmByStage)), 
-         function(stageIndex, tpmByStage, ontologyClass, allGenes, sigLevel){
-           stageSubset <- tpmByStage[[stageIndex]]
-           stageName <- levels(rnaseqSampleInfo$stageName)[stageIndex]
-           stageName <- gsub("%", "pc", stageName)
-           outputPrefix <- file.path( 
-             'output',
-             'topgo',
-             'maxByStage',
-             paste(stageName, ontologyClass, 'topGO', sep='.')
-           )
-           gene_list <- colnames(stageSubset)
-           runTopGO( gene_list, ontologyClass, allGenes, outputPrefix , sigLevel )
-         },
-         tpmByStage, ontologyClass, allGenes, 0.05
-       )
-}
 
 #' outputStageGenes
 #' outputs of file of gene Ids with gene names for each stage
@@ -1878,6 +1856,29 @@ outputStageGenes <- function( stageIndex, countsList, allGenes ){
   write.table(geneInfo, file=paste0(outputPrefix, ".gene-list.tsv"),
               quote=FALSE, row.names=FALSE, col.names=FALSE, sep="\t")
   
+}
+
+```
+
+```{r run_GO, include=TRUE, eval=FALSE}
+allGenes <- do.call(c, lapply(tpmByStage, function(x){ colnames(x) } ) )
+for( ontologyClass in c('BP', 'MF', 'CC') ){
+  lapply(seq_len(length(tpmByStage)), 
+         function(stageIndex, tpmByStage, ontologyClass, allGenes, sigLevel){
+           stageSubset <- tpmByStage[[stageIndex]]
+           stageName <- levels(rnaseqSampleInfo$stageName)[stageIndex]
+           stageName <- gsub("%", "pc", stageName)
+           outputPrefix <- file.path( 
+             'output',
+             'topgo',
+             'maxByStage',
+             paste(stageName, ontologyClass, 'topGO', sep='.')
+           )
+           gene_list <- colnames(stageSubset)
+           runTopGO( gene_list, ontologyClass, allGenes, outputPrefix , sigLevel )
+         },
+         tpmByStage, ontologyClass, allGenes, 0.05
+       )
 }
 
 invisible( lapply(seq_len(length(tpmByStage)), outputStageGenes, tpmByStage, allGenes ) )
