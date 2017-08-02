@@ -4005,6 +4005,31 @@ pairwiseCorList <- lapply( seq_len(nrow(paraloguesData)),
 pairwiseCor <- do.call( rbind, pairwiseCorList )
 pairwiseCor <- pairwiseCor[!is.na(pairwiseCor$CorCoeff),]
 pairwiseCor$type <- rep('paralogue_pairs', nrow(pairwiseCor))
+
+pairwise_cor_info <- merge(pairwiseCor, paraloguesData, 
+                           by.x = c('gene1', 'gene2'), 
+                           by.y = c('paralogue1ID', 'paralogue2ID') )
+
+pairwise_cor_info <- merge(pairwise_cor_info, tpmFilt, 
+                           by.x = 'gene1', by.y = 'row.names' )
+colnames(pairwise_cor_info) <- 
+  c( colnames(pairwise_cor_info)[1:10],
+     paste0(colnames(pairwise_cor_info)[11:100], '_gene1'))
+
+pairwise_cor_info <- merge(pairwise_cor_info, tpmFilt, 
+                           by.x = 'gene2', by.y = 'row.names' )
+colnames(pairwise_cor_info) <- 
+  c( colnames(pairwise_cor_info)[1:100],
+     paste0(colnames(pairwise_cor_info)[101:190], '_gene2'))
+
+# this merge makes gene2 the first column
+# reorder
+pairwise_cor_info <- pairwise_cor_info[, c(2,1,3:190)]
+
+write.table(pairwise_cor_info, file = 
+              file.path(rootPath, 'output', 'paralogues_data.plus_counts.tsv'),
+            row.names = FALSE, col.names = TRUE,
+            sep = "\t", quote = FALSE)
 ```
 
 ```{r addGeneNames}
@@ -4395,6 +4420,27 @@ output/topgo/cor-genes/$corThreshold.$ontology.topGO.tsv \
 output/topgo/cor-genes/$corThreshold.gene-list.tsv > output/topgo/cor-genes/$corThreshold.$ontology.enriched-GO.tsv
 done
 done
+
+# concatenate results
+perl -le 'print join("\t", qw{Group GO.ID Term Domain Expected Observed pvalue FoldEnrichment});' \
+ > output/topgo/cor-genes/topGOResults.sig.tsv
+for corThreshold in all 0.9 -0.5
+do
+for ontology in BP CC MF
+do
+perl -F"\t" -lane 'BEGIN{
+  %domain_for = (
+    BP => "biological_process",
+    MF => "molecular_function",
+    CC => "cellular_component",
+  );
+}
+{$domain = $domain_for{"'$ontology'"};
+print join("\t", "'$corThreshold'", @F[0,1], $domain, @F[3,4,2,5]);
+}' \
+output/topgo/cor-genes/$corThreshold.$ontology.enriched-GO.tsv 
+done
+done >> output/topgo/cor-genes/topGOResults.sig.tsv
 
 ```
 
