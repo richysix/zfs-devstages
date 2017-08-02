@@ -79,7 +79,7 @@ fi
 ```
 
 ```{r loadRNASeqData}
-DeseqDataFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'DESeq.zfs.rnaseq.grcz10.RData')
+DeseqDataFile <- file.path(rootPath, 'output', 'DESeq.zfs.rnaseq.grcz10.RData')
 if( file.exists(DeseqDataFile) ){
   load(DeseqDataFile)
 } else {
@@ -295,7 +295,7 @@ dev.off()
 ```{r getTranscriptInfo}
 # check for the existence of Transcript info
 # Ensembl version is set at the top of the script
-TranscriptsFile <- file.path(rootPath, 'dataFiles', 'rnaseq', paste0('Danio_rerio.e', ensVersion, '.transcript.lengths.tsv') )
+TranscriptsFile <- file.path(rootPath, 'output', paste0('Danio_rerio.e', ensVersion, '.transcript.lengths.tsv') )
 gtfFile <- file.path(rootPath, paste0('dataFiles', 'Danio_rerio.GRCz10.', ensVersion, '.gtf') )
 
 if( file.exists(TranscriptsFile) ){
@@ -4259,7 +4259,7 @@ write.table(sig_results, file = file.path(rootPath, 'output', 'topgo', 'cor-gene
 
 ## DETCT Data
 ```{r loadDETCTData}
-detctDataFile <- file.path(rootPath, 'dataFiles', 'detct', 'DESeq.zfs.detct.grcz10.RData')
+detctDataFile <- file.path(rootPath, 'output', 'DESeq.zfs.detct.grcz10.RData')
 # load from file if it exists
 if( file.exists(detctDataFile) ){
   load(detctDataFile)
