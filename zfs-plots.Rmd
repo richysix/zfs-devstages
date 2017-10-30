@@ -4906,7 +4906,7 @@ perl ./parse_GO_results.pl \
 --fold_enrichment 1.3 --min_genes 5 \
 --output_file output/topgo/mult-ends/stricter-mult-ends.$ontology.topGO.sig.tsv \
 output/topgo/mult-ends/stricter-mult-ends.$ontology.topGO.tsv \
-dataFiles/1551_ENSG.txt > output/topgo/mult-ends/stricter-mult-ends.$ontology.enriched-GO.tsv
+output/topgo/mult-ends/1551.gene-list.tsv > output/topgo/mult-ends/stricter-mult-ends.$ontology.enriched-GO.tsv
 done
 
 # concatenate results
@@ -4932,12 +4932,15 @@ done >> output/topgo/mult-ends/topGOResults.sig.tsv
 ```{r mult_end_pfam_domains}
 mult_ends_genes_Pfam <- getPfamForGenes( ensBiomart, genes_with_mult_ends, pfamDesc )
 write.table(mult_ends_genes_Pfam, file = file.path(rootPath, 'output', 'topgo', 'cor-genes', '0.9.pfam.tsv'), quote = FALSE, sep = "\t", row.names = FALSE, col.names = TRUE)
+# Remove genes with no pfam
+mult_ends_genes_Pfam <- mult_ends_genes_Pfam[ mult_ends_genes_Pfam$pfam != '', ]
+mult_ends_genes_pfam_counts <- table(mult_ends_genes_Pfam$pfam)
 
 # count up numbers of genes with each pfam domain
-all_genes_pfam <- getPfamForGenes( ensBiomart, allGenes, pfamDesc )
+all_genes_pfam <- getPfamForGenes( ensBiomart, as.character(AllGenesInfo$ensembl_gene_id), pfamDesc )
+all_genes_pfam <- all_genes_pfam[ all_genes_pfam$pfam != '', ]
 pfam_counts <- table(all_genes_pfam$pfam)
 
-mult_ends_genes_pfam_counts <- table(mult_ends_genes_Pfam$pfam)
 # binomial test for enrichment
 gene_set_size <- length(genes_with_mult_ends)
 domains <- unique(mult_ends_genes_Pfam$pfam)
