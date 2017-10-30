@@ -4579,6 +4579,7 @@ write.table(sig_results, file = file.path(rootPath, 'output', 'topgo', 'cor-gene
 ```
 
 ## DETCT Data
+
 ```{r loadDETCTData}
 detctDataFile <- file.path(rootPath, 'output', 'DESeq.zfs.detct.grcz10.RData')
 # load from file if it exists
@@ -4664,41 +4665,11 @@ detctReadData$sampleType <- factor( sampleType,
 detctReadDataMerged <- merge(detctReadData, detctSampleInfo)
 ```
 
-```{r detct_genes_detected, eval=FALSE}
-detctCounts <- counts(detctDESeqDataSet, normalized = TRUE)
-countThreshold <- 5
-# collect data on how many genes are detected in each sample
-# Each gene is potentially represented by multiple regions
-# Count as detected if any of the regions for a gene is above threshold
-detctGenesDetectedBySampleList <- vector('list', length = nlevels(detctData$e86.Ensembl.Gene.ID) - 1 )
-j <- 1
-for (gene in levels(detctData$e86.Ensembl.Gene.ID) ) {
-  if (gene == "-") {
-    next
-  }
-  counts <- detctCounts[rownames(detctData)[ detctData$e86.Ensembl.Gene.ID == gene ], , drop = FALSE]
-  aboveThreshold <- counts >= countThreshold
-  aboveThresholdList <- split.data.frame(aboveThreshold, rownames(aboveThreshold))
-  detctGenesDetectedBySampleList[[j]] <- Reduce('|', aboveThresholdList)
-  j <- j + 1
-}
-detctGenesDetectedBySampleByGene <- do.call(rbind, detctGenesDetectedBySampleList)
-detctGenesDetectedBySample <- melt(colSums(detctGenesDetectedBySampleByGene))
-detctGenesDetected <- data.frame(
-  sampleName = rownames(detctGenesDetectedBySample),
-  sampleType = rep('DETCT', nrow(detctGenesDetectedBySample) ),
-  threshold = rep(countThreshold, nrow(detctGenesDetectedBySample)),
-  genes = detctGenesDetectedBySample$value
-)
-detctGDData <- merge(detctGenesDetected, detctSampleInfo )
-
-```
-
-### Figure 1-3
+### Figure 9-figure supplement 1
 
 #### DETCT Sample QC plot
 
-```{r fig1-3, include=TRUE}
+```{r fig9-1, include=TRUE}
 # create sample correlation matrix
 detctSampleCor <- cor(counts(detctDESeqDataSet, normalized=TRUE))
 # detctSampleCor <- cor(counts(detctDESeqDataSet, normalized=TRUE)[, grepl('pool', colnames(counts(detctDESeqDataSet)))])
@@ -4720,9 +4691,6 @@ detctSampleCorHeatmap <- ggplot(data = detctSampleCor.m) +
                         legend.title = element_text(colour='black' ),
                         axis.text.x = element_text(colour='black', angle = 90, 
                                                    size = 0.5, hjust = 1, debug = FALSE ) )
-
-plotList <- add_to_plot_list( plotList, 
-                              detctSampleCorHeatmap, file.path(rootPath, 'plots', 'Figure.1-3.pdf') )
 
 print(detctSampleCorHeatmap)
 
@@ -4746,36 +4714,14 @@ detctSampleCor_spearman_heatmap <- ggplot(data = detctSampleCor_spearman.m) +
                                                    size = 0.5, hjust = 1, debug = FALSE ) )
 print(detctSampleCor_spearman_heatmap)
 
-pdf(file.path(rootPath, 'plots', 'Figure.1-3.spearman.pdf'))
+# pdf(file.path(rootPath, 'plots', 'Figure.1-3.spearman.pdf'))
+postscript(file.path(rootPath, 'plots', 'Figure.9-1.spearman.eps'))
 print(detctSampleCor_spearman_heatmap)
-dev.off()
-
-# how it looks to those with deuteranopia
-ggplot(data = detctSampleCor_spearman.m) + 
-  geom_tile( aes( x = Var1, y = Var2, fill = value ) ) + 
-  scale_fill_gradientn( colours = dichromat(c("blue", "yellow", "red")),
-                        guide = guide_colorbar(title = "Correlation\nCoefficient\n(Spearman)"),
-                        limits = c(0,1) ) + 
-  theme_void() + theme( legend.position="right",
-                        legend.title = element_text(colour='black' ),
-                        axis.text.x = element_text(colour='black', angle = 90, 
-                                                   size = 0.5, hjust = 1, debug = FALSE ) )
-
-# use viridis colour scheme
-pdf(file.path(rootPath, 'plots', 'Figure.1-3.spearman.viridis.pdf'))
-ggplot(data = detctSampleCor_spearman.m) + 
-  geom_tile( aes( x = Var1, y = Var2, fill = value ) ) + 
-  scale_fill_viridis( guide = guide_colorbar(title = "Correlation\nCoefficient\n(Spearman)"),
-                        limits = c(0,1) ) + 
-  theme_void() + theme( legend.position="right",
-                        legend.title = element_text(colour='black' ),
-                        axis.text.x = element_text(colour='black', angle = 90, 
-                                                   size = 0.5, hjust = 1, debug = FALSE ) )
 dev.off()
 
 ```
 
-### Figure 1-4
+### Figure 9-figure supplement 2
 
 #### DETCT PCA
 
@@ -4784,10 +4730,10 @@ varRegionThreshold <- 0.01
 detctpcaObj <- runPCA( detctDESeqDataSet, detctDESeqDataSetVst, nrow(detctDESeqDataSetVst) )
 ```
 
-```{bash organise_dir}
+```{bash organise_detct_dir}
 mkdir output/pca/detct
 mv output/pca/PC* output/pca/detct/
-# edit files to replace gene+id in header with region
+# edit files to replace gene_id in header with region
 for file in $( find output/pca/detct | grep tsv$ )
 do
 sed -i '.tmp' -e 's|gene_id|region|' $file
@@ -4813,12 +4759,6 @@ grid.draw(
               )
 )
 dev.off()
-```
-
-### 3' ends
-
-```{r 3_ends}
-table( mcols(detctDESeqDataSet)[['e86.Ensembl.Gene.ID']] )
 ```
 
 ```{r compare_overlap_pca_gene_contributions}
@@ -4921,6 +4861,8 @@ dev.off()
 print(barPlot)
 ```
 
+### 3' ends
+
 ```{r multiple_ends_go}
 genes_with_mult_ends_file <- file.path(rootPath, 'dataFiles', '1551_ENSG.txt')
 genes_with_mult_ends <- read.table(file = genes_with_mult_ends_file, header = FALSE, sep = "\t")
@@ -4952,12 +4894,11 @@ write.table(mult_ends_gene_list,
 
 ```
 
-```{bash multiple_ends_parse_GO, eval=FALSE}
+```{bash multiple_ends_parse_GO}
 # Run parse_GO script on paralogues GO output
 # add local library paths
 eval $(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)
 
-# for stage in '1-cell' '2-cell' '128-cell' '1k-cell' 'Dome' '50pc-epiboly' 'Shield' '75pc-epiboly' '1-4-somites' '14-19-somites' '20-25-somites' 'Prim-5' 'Prim-15' 'Prim-25' 'Long-pec' 'Protruding-mouth' 'Day-4' 'Day-5'
 for ontology in BP CC MF
 do
 perl ./parse_GO_results.pl \
@@ -4988,7 +4929,7 @@ done >> output/topgo/mult-ends/topGOResults.sig.tsv
 
 ```
 
-```{r pfam_domains}
+```{r mult_end_pfam_domains}
 mult_ends_genes_Pfam <- getPfamForGenes( ensBiomart, genes_with_mult_ends, pfamDesc )
 write.table(mult_ends_genes_Pfam, file = file.path(rootPath, 'output', 'topgo', 'cor-genes', '0.9.pfam.tsv'), quote = FALSE, sep = "\t", row.names = FALSE, col.names = TRUE)
 
@@ -5137,46 +5078,33 @@ dev.off()
 ### e90 new genes
 
 ```{r new_genes}
-dataFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'zfs-rnaseq-grcz10.e90.tpm.genes.tsv')
+dataFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'zfs-rnaseq-grcz10_e90_tpm_genes.tsv')
 tpm_e90 <- read.table(dataFile, header = TRUE, sep ="\t", quote = "\"")
+rownames(tpm_e90) <- as.character(tpm_e90[[1]])
 
-tpm_e90_mat <- as.matrix(tpm_e90[,2:91])
+tpm_e90_mat <- as.matrix(tpm_e90[,9:ncol(tpm_e90)])
 rownames(tpm_e90_mat) <- as.character(tpm_e90[[1]])
 colnames(tpm_e90_mat) <- as.character(rnaseqSampleInfo$sampleName)
 
+# divide data up by Gene and then Stage
+tpm_e90_ByGeneList <- split.data.frame(tpm_e90_mat, 
+                                  factor(rownames(tpm_e90_mat), 
+                                          levels = rownames(tpm_e90_mat))
+                                  )
+tpm_e90_ByGeneByStageList <- lapply(tpm_e90_ByGeneList,
+                               function(x){ 
+                                 split.data.frame(t(x), rnaseqSampleInfo$stageName) } )
 
+# filter to genes with non-zero TPM in all replicates at at least one stage
+tpmThreshold <- 0
+genesAboveThreshold <- sapply( tpm_e90_ByGeneByStageList,
+                               function(geneByStageList){
+                                 any( sapply(geneByStageList, 
+                                             function(x){ all(x > tpmThreshold) } ) )
+                               }
+                        )
+tpm_e90_Filt <- tpm_e90_mat[genesAboveThreshold, ]
 
-# dataFiles/rnaseq/zfs-rnaseq-grcz10.e90.tpm.genes.tsv
-# 
-# if( !file.exists(dataFile) ){
-#   stop("RNA-seq counts data file is not present! Please download from figshare. See README.")
-# }
-# rnaseqData_90 <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"")
-# # data contains a gene id column and then a column of counts for each sample
-# countData_90 <- rnaseqData_90[ , -1 ]
-# rownames(countData_90) <- rnaseqData_90[[1]]
-# 
-# # sample info is the same, rnaseqSampleInfo already exists
-# # order count data in stage order
-# colorder <- sapply( rnaseqSampleInfo$sample, 
-#                     function(x){ which( colnames(countData_90) == x ) } )
-# countData_90 <- countData_90[ , colorder ]
-# 
-# # relabel colnames with sample names
-# colnames(countData_90) <- rownames(rnaseqSampleInfo)
-# 
-# # make DESeq object and do rlog transform
-# dds_90 <- DESeqDataSetFromMatrix(countData_90, rnaseqSampleInfo, design = ~ condition)
-# 
-# # # add metadata
-# # featureData <- rnaseqData_90[ , !grepl("count", colnames(rnaseqData_90) ) ]
-# # mcols(dds) <- DataFrame(mcols(dds), featureData)
-# 
-# dds_90 <- estimateSizeFactors(dds_90)
-# # dds_90_Rlog <- rlogTransformation(dds_90, blind=TRUE)
-# 
-# # save objects to file for reloading
-# # save(rnaseqData_90, countData_90, rnaseqSampleInfo, dds_90, dds_90_Rlog, file=DeseqDataFile)
 ```
 
 ```{r new_genes_counts_heatmap, include = TRUE}
@@ -5185,7 +5113,40 @@ new_genes <- read.table(file = new_gene_file, sep = "\t", header = FALSE,
                         colClasses = c('character'))
 new_genes_tpm <- tpm_e90_mat[ as.character(new_genes[[1]]), ]
 
-new_genes_info <- cluster_and_plot_tpms(log10(new_genes_tpm + 1))
+new_genes_annotation <- tpm_e90[as.character(new_genes[[1]]), c('Gene.ID', 'Chr', 'Start', 'End', 'Biotype', 'Name', 'Description')]
+
+new_genes_unnamed <- Reduce('|',
+                            lapply( as.list(patterns),
+                              function( pattern, new_genes_annotation ){ grepl(pattern, new_genes_annotation$Name, perl = TRUE ) },
+                              new_genes_annotation )
+)
+# number of unnamed genes
+sum(new_genes_unnamed)
+# 
+
+
+# divide data up by Gene and then Stage
+filter_tpm <- function(tpm, tpmThreshold = 0){
+  tpm_ByGeneList <- split.data.frame(tpm, 
+                                  factor(rownames(tpm), 
+                                          levels = rownames(tpm))
+                                  )
+  tpm_ByGeneByStageList <- lapply(tpm_ByGeneList,
+                                   function(x){ 
+                                     split.data.frame(t(x), rnaseqSampleInfo$stageName) } )
+
+  # filter to genes with non-zero TPM in all replicates at at least one stage
+  genesAboveThreshold <- sapply( tpm_ByGeneByStageList,
+                                 function(geneByStageList){
+                                   any( sapply(geneByStageList, 
+                                               function(x){ all(x > tpmThreshold) } ) )
+                                 }
+                        )
+  tpm_filt <- tpm[genesAboveThreshold, ]
+}
+
+new_genes_Filt <- filter_tpm(new_genes_tpm)
+new_genes_info <- cluster_and_plot_tpms(log10(new_genes_Filt + 1))
 
 pdf(file = file.path(rootPath, 'plots', 'e90.new_genes.log10.heatmap.pdf'))
 new_genes_info$plot + 
@@ -5222,12 +5183,59 @@ grid.draw(
 )
 dev.off()
 
-new_lincs_file <- file.path(rootPath, 'dataFiles', 'new_genes.linc.90.txt')
+
+# 
+mean_expr_protein_coding <- apply(tpm_e90_mat[tpm_e90$Biotype == 'protein_coding', ], 1, mean)
+new_genes_L <- Reduce('|', lapply(rownames(new_genes_tpm), 
+                                function(x){ names(mean_expr_protein_coding) == x }) )
+mean_expr_new_genes <- mean_expr_protein_coding[new_genes_L]
+mean_expr_protein_coding <- mean_expr_protein_coding[!new_genes_L]
+
+mean_expr_new_genes.m <- melt(mean_expr_new_genes)
+mean_expr_new_genes.m$type <- rep('new', nrow(mean_expr_new_genes.m))
+mean_expr_protein_coding.m <- melt(mean_expr_protein_coding)
+mean_expr_protein_coding.m$type <- rep('existing', nrow(mean_expr_protein_coding.m))
+
+mean_expr_data <- rbind(mean_expr_new_genes.m, mean_expr_protein_coding.m)
+mean_expr_data$type <- factor(mean_expr_data$type,
+                              levels = c('existing', 'new'))
+
+protein_coding_e89_median_mean_tpm <- median(mean_expr_data$value[ mean_expr_data$type == 'existing'])
+protein_coding_e90_median_mean_tpm <- median(mean_expr_data$value[ mean_expr_data$type == 'new'])
+
+# plot distributions
+mean_expr_dist <- ggplot(data=mean_expr_data) + 
+  geom_vline(xintercept = c(protein_coding_e89_median_mean_tpm, protein_coding_e90_median_mean_tpm),
+             colour = c('firebrick2', 'steelblue3'),
+             linetype = c(5,2)) +
+  geom_density(aes(x = value, fill = type), alpha = 0.4) + 
+  scale_x_continuous(limits = c(0.0078125,1024), trans = log2_trans(),
+                     labels = print_log2_as_exponent) +
+  labs(x = expression(paste('Mean Expression ', log[2], '(TPM)')), y = 'Frequency') +
+  scale_fill_manual(values = c('firebrick2', 'steelblue3'), 
+                    labels = c('Ensembl v89', 'Ensembl v90')) +
+  guides(fill = guide_legend(title = 'Type', override.aes = list(alpha = 1))) +
+  theme_minimal()
+
+# postscript doesn't support semi-transparency
+pdf(file = file.path(rootPath, 'plots', 'fig7.mean_expr_dist.pdf'),
+           height = 7, width = 7)
+print(mean_expr_dist + theme(axis.text = element_text(size = 12),
+                             axis.title = element_text(size = 16),
+                             legend.text = element_text(size = 12),
+                             legend.title = element_text(size = 16)
+                             ))
+dev.off()
+
+# lincRNA
+new_lincs_file <- file.path(rootPath, 'dataFiles', 'e90_subtract_e89_lincRNA_gene-id.txt')
 new_lincs <- read.table(file = new_lincs_file, sep = "\t", header = FALSE,
                         colClasses = c('character'))
 new_lincs_tpm <- tpm_e90_mat[ as.character(new_lincs[[1]]), ]
-# rmove lines with 0 sd
+
+# remove lines with 0 sd
 new_lincs_tpm <- new_lincs_tpm[ rowSds(new_lincs_tpm) != 0, ]
+new_lincs_Filt <- filter_tpm(new_lincs_tpm)
 
 new_lincs_info <- cluster_and_plot_tpms(log10(new_lincs_tpm + 1))
 
@@ -5238,127 +5246,17 @@ grid.draw(
                                scale_fill_gradientn( colours = c("blue", "yellow", "red"),
                                     guide = guide_colorbar(title = expression(paste(log[10], "(TPM)", sep = '') ) ) ) +
                                theme(legend.position="right"),
-                             sampleStrip + theme( plot.margin = unit(c(0,0.146,0,0), unit = 'npc') ) ),
+                             sampleStrip + theme( plot.margin = unit(c(0,0.152,0,0), unit = 'npc') ) ),
                ncol = 1,
                heights = c(0.95,0.05)
   )
 )
 dev.off()
 
-
-```
-
-```{r new_lincRNAs_heatmap}
-new_lincs_file <- file.path(rootPath, 'dataFiles', 'new_genes.linc.90.txt')
-new_lincs <- read.table(file = new_lincs_file, sep = "\t", header = FALSE,
-                        colClasses = c('character'))
-new_lincs_counts <- counts(dds_90, normalized = TRUE)[ new_lincs[[1]], ]
-# filter any not expressed in our data set
-new_lincs_counts <- new_lincs_counts[
-  !(sapply(rownames(new_lincs_counts),
-            function(gene_name){ all(new_lincs_counts[gene_name, ] == 0) } ) ), ]
-
-new_lincs_info <- cluster_and_plot_tpms(log10(new_lincs_counts + 1))
-
-new_lincs_info$plot
-
-pdf(file = file.path(rootPath, 'plots', 'e90.new_lincRNAs.log10.heatmap.sample_strip.pdf'))
+pdf(file = file.path(rootPath, 'plots', 'e90.new_lincRNAs.filtered.log10.tpm.heatmap.sample_strip.pdf'))
 grid.newpage()
 grid.draw( 
-  arrangeGrob( grobs = list( new_lincs_info$plot + 
-                               scale_fill_gradientn( colours = c("blue", "yellow", "red"),
-                                    guide = guide_colorbar(title = expression(paste(log[10], "(NC)", sep = '') ) ) ) +
-                               theme(legend.position="right"),
-                             sampleStrip + theme( plot.margin = unit(c(0,0.138,0,0), unit = 'npc') ) ),
-               ncol = 1,
-               heights = c(0.95,0.05)
-  )
-)
-dev.off()
-
-```
-
-```{r get_e90_TranscriptInfo}
-# check for the existence of Transcript info
-ensVersion <- 90
-TranscriptsFile <- file.path(rootPath, 'output', paste0('Danio_rerio.e', ensVersion, '.transcript.lengths.tsv') )
-gtfFile <- file.path(rootPath, 'dataFiles', paste0('Danio_rerio.GRCz10.', ensVersion, '.gtf') )
-
-if( file.exists(TranscriptsFile) ){
-  TxInfo <- read.table(file=TranscriptsFile, sep="\t", row.names = 1)
-  TxLengths <- TxInfo[[1]]
-  names(TxLengths) <- rownames(TxInfo)
-} else{
-  # check for the existence of TxDb file
-  TxDbFile <- file.path(rootPath, 'output', paste0('Danio_rerio.GRCz10.', ensVersion, '.db') )
-  if( file.exists( TxDbFile ) ){
-    txdb <- loadDb( TxDbFile )
-  } else {
-    # make TxDb from GFF file
-    txdb <- makeTxDbFromGFF(
-      gtfFile, format="gtf",
-      dataSource = "Ensembl",
-      organism = "Danio rerio",
-      taxonomyId = 7955
-    )
-    # save to db file
-    saveDb( txdb, TxDbFile )
-  }
-  # calculate lengths of transcripts
-  exonsByGene <- exonsBy(txdb, by="gene")
-  TxLengths <- sapply(exonsByGene, 
-                      function( gene ){ sum( width( reduce(unlist(gene)) ) ) }
-  )
-  write.table(TxLengths, file=TranscriptsFile, 
-              row.names=TRUE, sep="\t", quote=FALSE, col.names = FALSE)
-}
-```
-
-```{r create_and_filter_tpm}
-tpm_90 <- counts_to_tpm(counts(dds_90), TxLengths, insertSizes)
-
-# divide data up by Gene and then Stage
-tpm_90_ByGeneList <- split.data.frame(tpm_90, 
-                                  factor(rownames(tpm_90), 
-                                          levels = rownames(tpm_90))
-                                  )
-tpm_90_ByGeneByStageList <- lapply(tpm_90_ByGeneList,
-                               function(x){ 
-                                 split.data.frame(t(x), rnaseqSampleInfo$stageName) } )
-
-# filter to genes with non-zero TPM in all replicates at at least one stage
-tpmThreshold <- 0
-genesAboveThreshold <- sapply( tpm_90_ByGeneByStageList,
-                               function(geneByStageList){
-                                 any( sapply(geneByStageList, 
-                                             function(x){ all(x > tpmThreshold) } ) )
-                               }
-                        )
-tpm_90_Filt <- tpm_90[genesAboveThreshold, ]
-
-```
-
-```{r new_genes_counts_heatmap, include = TRUE}
-# new_gene_file <- file.path(rootPath, 'dataFiles', 'new_genes.90.txt')
-# new_genes <- read.table(file = new_gene_file, sep = "\t", header = FALSE,
-#                         colClasses = c('character'))
-genes_ids_in_tpm <- new.env()
-for( gene in rownames(tpm_90_Filt)){
-  genes_ids_in_tpm[[gene]] <- TRUE
-}
-missing_genes <- new_genes[[1]][ !sapply(new_genes[[1]], 
-                                    function(x){ exists(x, envir = genes_ids_in_tpm) }) ]
-new_genes <- new_genes[[1]][ sapply(new_genes[[1]], 
-                                    function(x){ exists(x, envir = genes_ids_in_tpm) }) ]
-new_genes_tpm <- tpm_90_Filt[ new_genes, ]
-
-new_genes_info <- cluster_and_plot_tpms(log10(new_genes_tpm + 1))
-
-# plot 
-pdf(file = file.path(rootPath, 'plots', 'e90.new_genes.log10.tpm.heatmap.pdf'))
-grid.newpage()
-grid.draw( 
-  arrangeGrob( grobs = list( new_genes_info$plot + 
+  arrangeGrob( grobs = list( cluster_and_plot_tpms(log10(new_lincs_Filt + 1))$plot + 
                                scale_fill_gradientn( colours = c("blue", "yellow", "red"),
                                     guide = guide_colorbar(title = expression(paste(log[10], "(TPM)", sep = '') ) ) ) +
                                theme(legend.position="right"),
@@ -5369,6 +5267,85 @@ grid.draw(
 )
 dev.off()
 
+# expression distribution (mean TPM)
+new_lincs_mean_tpm <- apply(new_lincs_tpm, 1, mean)
+new_lincs_mean_tpm.m <- melt(new_lincs_mean_tpm)
+new_lincs_mean_tpm.m$biotype <- rep('lincRNA', nrow(new_lincs_mean_tpm.m))
+
+# subset tpm to protein coding
+coding_genes_file <- file.path(rootPath, 'dataFiles', 'e90_protein_coding_ids.txt')
+coding_genes <- read.table(file = coding_genes_file, header = FALSE)
+coding_genes_e90_tpm <- tpm_e90_mat[ as.character(coding_genes[, 1]), ]
+coding_genes_mean_tpm <- apply(coding_genes_e90_tpm, 1, mean)
+coding_genes_mean_tpm.m <- melt(coding_genes_mean_tpm)
+coding_genes_mean_tpm.m$biotype <- rep('protein_coding', nrow(coding_genes_mean_tpm.m))
+
+mean_tpm_by_biotype <- rbind(coding_genes_mean_tpm.m, new_lincs_mean_tpm.m)
+mean_tpm_by_biotype$biotype <- factor(mean_tpm_by_biotype$biotype,
+                                 levels = c('protein_coding', 'lincRNA'))
+
+new_lincs_median_mean_tpm <- median(mean_tpm_by_biotype$value[ mean_tpm_by_biotype$biotype == 'lincRNA'])
+coding_genes_median_mean_tpm <- median(mean_tpm_by_biotype$value[ mean_tpm_by_biotype$biotype == 'protein_coding'])
+
+new_lincs_mean_mean_tpm <- mean(mean_tpm_by_biotype$value[ mean_tpm_by_biotype$biotype == 'lincRNA'])
+coding_genes_mean_mean_tpm <- mean(mean_tpm_by_biotype$value[ mean_tpm_by_biotype$biotype == 'protein_coding'])
+
+new_linc_tpm_dist <- ggplot(data = mean_tpm_by_biotype) + 
+  geom_vline(xintercept = c(coding_genes_median_mean_tpm, new_lincs_median_mean_tpm),
+             colour = c('firebrick2', 'steelblue3'),
+             linetype = c(5,2)) +
+  geom_density(aes(x = value, fill = biotype), alpha = 0.3 ) + 
+  labs(x = expression(paste('Mean Expression ', log[2], '(TPM)')), y = 'Frequency') +
+  scale_x_continuous(trans = log2_trans(), limits = c(2^-8,2^13),
+                     labels = print_log2_as_exponent ) +
+  scale_fill_manual(values = c('firebrick2', 'steelblue3')) +
+  guides(fill = guide_legend(title = 'Biotype', override.aes = list(alpha = 1))) + 
+  theme_minimal()
+
+# postscript doesn't support semi-transparency
+pdf(file = file.path(rootPath, 'plots', 'e90_linc_tpm_dist.pdf'),
+           height = 7, width = 7)
+print(new_linc_tpm_dist + theme(axis.text = element_text(size = 12),
+                             axis.title = element_text(size = 16),
+                             legend.text = element_text(size = 12),
+                             legend.title = element_text(size = 16)
+                             ))
+dev.off()
+
+
+
+max_expr_coding <- apply(coding_genes_e90_tpm, 1, max)
+max_expr_linc <- apply(new_lincs_tpm, 1, max)
+max_expr_df <- data.frame(
+  biotype = c(rep('protein_coding', length(max_expr_coding)),
+              rep('lincRNA', length(max_expr_linc))),
+  max_expr = c(max_expr_coding, max_expr_linc)
+)
+max_expr_df$biotype <- factor(max_expr_df$biotype,
+                              levels = c('protein_coding', 'lincRNA'))
+
+new_linc_max_tpm_dist <- ggplot(data = max_expr_df) + 
+  geom_density(aes(x = max_expr, fill = biotype), alpha = 0.3 ) + 
+  scale_x_continuous(trans = log2_trans(), limits = c(0.125,32768)) +
+  scale_fill_manual(values = c('firebrick2', 'steelblue3')) +
+  guides(fill = guide_legend(override.aes = list(alpha = 1)))
+
+pdf(file = file.path(rootPath, 'plots', 'e90_linc_max_tpm_dist.pdf'))
+print(new_linc_max_tpm_dist)
+dev.off()
+
+
+# limit to most highly expressed for promoter analysis
+# order by max expression and take top 25%
+max_expr_linc <- max_expr_linc[ order(max_expr_linc, decreasing = TRUE) ]
+top25_linc <- names(max_expr_linc[1:ceiling(length(max_expr_linc)*0.25)])
+
+write.table(top25_linc, file = file.path(rootPath, 'output', 'top_0.25_linc_genes.txt'),
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+# also write out filtered set
+write.table(rownames(new_lincs_Filt), file = file.path(rootPath, 'output', 'linc_genes_expressed.txt'),
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
 
 ```
 
@@ -5455,37 +5432,223 @@ write.table(expressed, file = file.path(rootPath, 'output', 'e90.expressed.tsv')
             row.names = TRUE, col.names = NA, quote = FALSE, sep = "\t")
 ```
 
-```{r new_lincRNAs_heatmap}
-# new_lincs_file <- file.path(rootPath, 'dataFiles', 'new_genes.linc.90.txt')
-# new_lincs <- read.table(file = new_lincs_file, sep = "\t", header = FALSE,
-#                         colClasses = c('character'))
-genes_ids_in_tpm <- new.env()
-for( gene in rownames(tpm_90)){
-  genes_ids_in_tpm[[gene]] <- TRUE
-}
-missing_genes <- new_lincs[[1]][ !sapply(new_lincs[[1]], 
-                                    function(x){ exists(x, envir = genes_ids_in_tpm) }) ]
-new_linc_gene_ids <- new_lincs[[1]][ sapply(new_lincs[[1]], 
-                                    function(x){ exists(x, envir = genes_ids_in_tpm) }) ]
+```{r protein_coding_stats}
+protein_coding_exon_info_file <- file.path(rootPath, 'dataFiles', '2017-09-28_e90_protein-coding_exon-info.tsv')
+protein_coding_exon_info <- read.table(protein_coding_exon_info_file, sep ="\t")
+names(protein_coding_exon_info) <- c('gene_id', 'transcript_id', 'exon_id', 'chr', 'start', 
+                                     'end', 'strand')
 
-new_lincs_tpm <- tpm_90[ new_linc_gene_ids, ]
+protein_coding_exon_info$exon_size = protein_coding_exon_info$end - protein_coding_exon_info$start + 1
+mean(protein_coding_exon_info$exon_size)
+# [1] 235.2692
+median(protein_coding_exon_info$exon_size)
+# [1] 131
 
-new_lincs_tpm_info <- cluster_and_plot_tpms(log10(new_lincs_tpm + 1))
+# # plot histogram
+# ggplot(data = protein_coding_exon_info) + geom_histogram( aes(x = exon_size) )
 
-new_lincs_tpm_info$plot
+# plot histgram of exon sizes
+new_genes_L <- Reduce('|', lapply(rownames(new_genes_tpm), 
+                                  function(x){ protein_coding_exon_info$gene_id == x }) )
+new_genes_exon_info <- protein_coding_exon_info[new_genes_L, ]
+existing_genes_exon_info <- protein_coding_exon_info[!new_genes_L, ]
 
-pdf(file = file.path(rootPath, 'plots', 'e90.new_lincRNAs.log10.tpm.heatmap.sample_strip.pdf'))
-grid.newpage()
-grid.draw( 
-  arrangeGrob( grobs = list( new_lincs_tpm_info$plot + 
-                               scale_fill_gradientn( colours = c("blue", "yellow", "red"),
-                                    guide = guide_colorbar(title = expression(paste(log[10], "(TPM)", sep = '') ) ) ) +
-                               theme(legend.position="right"),
-                             sampleStrip + theme( plot.margin = unit(c(0,0.152,0,0), unit = 'npc') ) ),
-               ncol = 1,
-               heights = c(0.95,0.05)
-  )
+protein_coding_exon_info$gene_type <- rep('existing', nrow(protein_coding_exon_info))
+protein_coding_exon_info$gene_type[new_genes_L] <- 'new'
+protein_coding_exon_info$gene_type <- factor(protein_coding_exon_info$gene_type,
+                                                   levels = c('new', 'existing'))
+
+mean(protein_coding_exon_info$exon_size[new_genes_L])
+mean(protein_coding_exon_info$exon_size[!new_genes_L])
+
+protein_coding_exon_size_hist <- ggplot(data = protein_coding_exon_info) + 
+  geom_histogram( aes(x = exon_size), binwidth = 100 ) + 
+  scale_x_continuous(limits = c(0,3000)) +
+  facet_wrap( ~ gene_type, scales = "free_y") +
+  geom_vline(data = mean_exons, aes(xintercept = median), colour = 'red') +
+  geom_text(data = labels,
+            aes(x = x, y = y, label = text), nudge_x = 5) + 
+  labs(x = "Number of Exons", y = "Frequency") + 
+  theme_minimal() +
+  theme( axis.text = element_text(size = 12),
+         axis.title = element_text(size = 14) )
+
+# aggregate info to transcript
+protein_coding_transcript_info <- ddply(protein_coding_exon_info, .(gene_id, transcript_id),
+                              summarise, num_exons = length(exon_id),
+                              transcript_length = sum(exon_size))
+
+# mean/median number of exons
+summary(protein_coding_transcript_info)
+
+new_genes_L <- Reduce('|', lapply(rownames(new_genes_tpm), 
+                                  function(x){ protein_coding_transcript_info$gene_id == x }) )
+new_genes_transcript_info <- protein_coding_transcript_info[new_genes_L, ]
+existing_genes_transcript_info <- protein_coding_transcript_info[!new_genes_L, ]
+
+protein_coding_transcript_info$gene_type <- rep('existing', nrow(protein_coding_transcript_info))
+protein_coding_transcript_info$gene_type[new_genes_L] <- 'new'
+protein_coding_transcript_info$gene_type <- factor(protein_coding_transcript_info$gene_type,
+                                                   levels = c('new', 'existing'))
+
+# plot histograms of num exons and transcript length
+mean_exons <- mean(protein_coding_transcript_info$num_exons)
+median_exons <- median(protein_coding_transcript_info$num_exons)
+average_labels <- data.frame(
+  x = as.numeric( c(median_exons, 10) ),
+  y = c(2300, 2300),
+  text = as.character(c(median_exons, sprintf('mean = %.2f', mean_exons)))
 )
+
+median_exons <- ddply(protein_coding_transcript_info, .(gene_type),
+                    summarise, mean = mean(num_exons),
+                    median = median(num_exons)
+)
+
+labels <- data.frame(
+  gene_type = rep(median_exons$gene_type, 2),
+  text = c(sprintf('median = %.0f', median_exons$median),
+           sprintf('mean = %.2f', median_exons$mean)),
+  x = c(median_exons$median, median_exons$mean + 30),
+  y = rep(c(50, 5600), 2)
+)
+
+protein_coding_num_exons_hist <- ggplot(data = protein_coding_transcript_info) + 
+  geom_histogram( aes(x = num_exons), binwidth = 1 ) + 
+  scale_x_continuous(limits = c(0,50)) +
+  facet_wrap( ~ gene_type, scales = "free_y") +
+  geom_vline(data = mean_exons, aes(xintercept = median), colour = 'red') +
+  geom_text(data = labels,
+            aes(x = x, y = y, label = text), nudge_x = 5) + 
+  labs(x = "Number of Exons", y = "Frequency") + 
+  theme_minimal() +
+  theme( axis.text = element_text(size = 12),
+         axis.title = element_text(size = 14) )
+
+postscript(file = file.path(rootPath, 'plots', 'fig7.num_exons-protein_coding.histogram.eps'),
+           width = 10, height = 7)
+print(protein_coding_num_exons_hist)
+dev.off()
+
+# histogram of transcript length
+mean_length <- mean(protein_coding_transcript_info$transcript_length)
+median_length <- median(protein_coding_transcript_info$transcript_length)
+average_labels <- data.frame(
+  x = as.numeric( c(median_length, 5000) ),
+  y = c(410, 410),
+  text = as.character(c(median_length, sprintf('mean = %.0f nt', mean_length)))
+)
+protein_coding_length_hist <- ggplot(data = protein_coding_transcript_info) + 
+  geom_histogram( aes(x = transcript_length), binwidth = 100 ) +
+  geom_vline(xintercept = median_length, colour = 'red') +
+  geom_text(data = average_labels, 
+            aes(x = x, y = y, label = text), colour = c('red', 'black'), nudge_x = 400) +
+  scale_x_continuous( limits = c(0,7000)) + 
+  labs(x = 'Transcript Length', y = 'Frequency') + 
+  theme_minimal() +
+  theme( axis.text = element_text(size = 12),
+         axis.title = element_text(size = 14) )
+
+postscript(file = file.path(rootPath, 'plots', 'fig7.length.histogram.eps'),
+           width = 7, height = 7)
+print(protein_coding_length_hist)
+dev.off()
+
+```
+
+```{r}
+# connect to e90 biomart
+e90_ensBiomart <- useMart( "ensembl", dataset="drerio_gene_ensembl")
+
+species_list <- c('hsapiens', 'mmusculus', 'rnorvegicus',
+             'amexicanus', 'gmorhua', 'trubripes','olatipes',
+             'gaculeatus', 'tnigroviridis')
+
+e90_lca_info <- get_largest_phylum(rownames(new_genes_tpm), species_list, e90_ensBiomart) 
+
+table(e90_lca_info$phylum)
+
+# get paralogues
+danio_paralogues <- getBM( 
+    filters = "ensembl_gene_id",
+    attributes = c('ensembl_gene_id',
+      'drerio_paralog_subtype'
+    ),
+    values = rownames(new_genes_tpm),
+    mart = e90_ensBiomart
+  )
+
+```
+
+```{r lincRNA_stats}
+linc_exon_info_file <- file.path(rootPath, 'dataFiles', '2017-09-19_e90_lincRNA-exon-info.tsv')
+linc_exon_info <- read.table(linc_exon_info_file, sep ="\t")
+names(linc_exon_info) <- c('gene_id', 'transcript_id', 'exon_id', 'chr', 'start', 'end', 'strand')
+
+# linc_exon_info
+linc_exon_info$exon_size = linc_exon_info$end - linc_exon_info$start + 1
+mean(linc_exon_info$exon_size)
+# [1] 331.1276
+median(linc_exon_info$exon_size)
+# [1] 167
+
+# plot histogram
+ggplot(data = linc_exon_info) + geom_histogram( aes(x = exon_size) )
+
+# aggregate info to transcript
+linc_transcript_info <- ddply(linc_exon_info, .(gene_id, transcript_id),
+                              summarise, num_exons = length(exon_id),
+                              transcript_length = sum(exon_size))
+
+# mean/median number of exons
+summary(linc_transcript_info)
+
+# plot histograms of num exons and transcript length
+mean_exons <- mean(linc_transcript_info$num_exons)
+median_exons <- median(linc_transcript_info$num_exons)
+average_labels <- data.frame(
+  x = as.numeric( c(median_exons, 10) ),
+  y = c(2300, 2300),
+  text = as.character(c(median_exons, sprintf('mean = %.2f', mean_exons)))
+)
+linc_num_exons_hist <- ggplot(data = linc_transcript_info) + 
+  geom_histogram( aes(x = num_exons), binwidth = 1 ) + 
+  geom_vline(xintercept = median_exons, colour = 'red') +
+  geom_text(data = average_labels,
+            aes(x = x, y = y, label = text), colour = c('red', 'black'), nudge_x = 0.4) + 
+  scale_x_continuous( limits = c(0,15)) + 
+  labs(x = "Number of Exons", y = "Frequency") + 
+  theme_minimal() +
+  theme( axis.text = element_text(size = 12),
+         axis.title = element_text(size = 14) )
+
+postscript(file = file.path(rootPath, 'plots', 'fig7.num_exons.histogram.eps'),
+           width = 7, height = 7)
+print(linc_num_exons_hist)
+dev.off()
+
+# histogram of transcript length
+mean_length <- mean(linc_transcript_info$transcript_length)
+median_length <- median(linc_transcript_info$transcript_length)
+average_labels <- data.frame(
+  x = as.numeric( c(median_length, 5000) ),
+  y = c(410, 410),
+  text = as.character(c(median_length, sprintf('mean = %.0f nt', mean_length)))
+)
+linc_length_hist <- ggplot(data = linc_transcript_info) + 
+  geom_histogram( aes(x = transcript_length), binwidth = 100 ) +
+  geom_vline(xintercept = median_length, colour = 'red') +
+  geom_text(data = average_labels, 
+            aes(x = x, y = y, label = text), colour = c('red', 'black'), nudge_x = 400) +
+  scale_x_continuous( limits = c(0,7000)) + 
+  labs(x = 'Transcript Length', y = 'Frequency') + 
+  theme_minimal() +
+  theme( axis.text = element_text(size = 12),
+         axis.title = element_text(size = 14) )
+
+postscript(file = file.path(rootPath, 'plots', 'fig7.length.histogram.eps'),
+           width = 7, height = 7)
+print(linc_length_hist)
 dev.off()
 
 ```
