@@ -33,6 +33,21 @@ add_to_plot_list <- function( plotList, plot, filename ){
 figNum <- 1
 ```
 
+```{r set_colour_palette}
+# colour palette
+colour_blind_palette <- 
+  c( 'blue' = rgb(0,0.45,0.7),
+     'yellow' = rgb(0.95, 0.9, 0.25),
+     'sky_blue' = rgb(0.35, 0.7, 0.9),
+     'purple' = rgb(0.8, 0.6, 0.7),
+     'orange' = rgb(0.9, 0.6, 0),
+     'vermillion' = rgb(0.8, 0.4, 0),
+     'blue_green' = rgb(0, 0.6, 0.5),
+     'black' = rgb(0, 0, 0) )
+cb_palette <- colour_blind_palette
+names(cb_palette) <- NULL
+```
+
 ```{r get_root}
 rootPath <- find_root(is_rstudio_project)
 for( dir in c('plots', 'output', 
@@ -2079,19 +2094,6 @@ combined_profile_data <- do.call(rbind,
                                           cluster_profile_data_list[[x]] }
                                  )
 )
-
-# colour palette
-colour_blind_palette <- 
-  c( 'blue' = rgb(0,0.45,0.7),
-     'yellow' = rgb(0.95, 0.9, 0.25),
-     'sky_blue' = rgb(0.35, 0.7, 0.9),
-     'purple' = rgb(0.8, 0.6, 0.7),
-     'orange' = rgb(0.9, 0.6, 0),
-     'vermillion' = rgb(0.8, 0.4, 0),
-     'blue_green' = rgb(0, 0.6, 0.5),
-     'black' = rgb(0, 0, 0) )
-cb_palette <- colour_blind_palette
-names(cb_palette) <- NULL
 
 # plot 
 example_clusters_scaled_profiles_plot <- 
