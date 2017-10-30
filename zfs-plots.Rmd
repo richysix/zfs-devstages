@@ -1517,7 +1517,8 @@ ggplotExprHeatmap <- function( exprMatrix, legendPosition = 'left' ){
 
 ```{r tpm_by_maxStage, include=TRUE}
 # transpose and split tpms by Stage
-tpmByStageList <- split(t(tpmFilt), rnaseqSampleInfo$stageName)
+tpmByStageList <- 
+  split(t(tpmFilt), rnaseqSampleInfo$stageName)
 # turn into a matrix with five observations for each stage
 tpmByStageMatList <- lapply(tpmByStageList, function(x){ matrix(x,nrow=5) } )
 # do colmeans
@@ -1593,7 +1594,8 @@ if( file.exists(AllGenesInfoFile) ){
   # attributes: ensembl_gene_id, external_gene_name, chromosome_name, start_position, end_position
   AllGenesInfo <- getBM(
     filters = "",
-    attributes = c('ensembl_gene_id', 'external_gene_name',
+    attributes = c('ensembl_gene_id', 'external_gene_name', 'entrezgene', 
+                   'zfin_id', 'zfin_symbol',
                    'chromosome_name', 'start_position', 'end_position' ),
     values = "",
     mart = ensBiomart
@@ -1625,7 +1627,8 @@ patterns <- c(
   '^im:[0-9]{7}$',
   '^si:.*$',
   '^wu:.*$',
-  '^zgc:[0-9]{5,6}$'
+  '^zgc:[0-9]{5,6}$',
+  '^$'
 )
 # produce a list of which genes match which patterns
 logicalList <- lapply( as.list(patterns),
@@ -1639,8 +1642,8 @@ characterisedGeneIds <- AllGenesInfo$ensembl_gene_id[ !uncharacterisedGenesL ]
 
 # this produces a list of lists.
 # each element in the list is a list of length 2 with
-# 1. The ids of the characterised genes assigned to this stage
-# 2. The ids of the UNcharacterised genes assigned to this stage
+# 1. The ids of the named genes assigned to this stage
+# 2. The ids of the unnamed genes assigned to this stage
 genesInClustersList <-lapply( tpmByStageClusteredList,
         function( tpmSubset, uncharacterisedGeneIds, characterisedGeneIds ){
           # this goes through each gene in the cluster and checks whether it exists in the uncharacterised set. This produces a list of logical vectors which are ORed together and used to subset the uncharacterised genes vector
@@ -1694,29 +1697,29 @@ geneCountsByCategory.m <- melt(geneCountsByCategory)
 geneCountsByCategory.m$value <- as.character( geneCountsByCategory.m$value )
 
 geneCountsByCategory.m.List <- split( geneCountsByCategory.m, geneCountsByCategory.m$Var2 )
-  data <- geneCountsByCategory
-  rows <- nrow(data)
+data <- geneCountsByCategory
+rows <- nrow(data)
 
-  x <- rep( c(2, 0.5), rows )
-  j <- 2 * rows
-  width <- rep( c(2,1), rows )
-  height <- numeric( length = j )
-  y <- numeric(length = j)
-  labels <- character(length = j)
-  # go through stages backwards. from 0 on the plot
-  height_offset <- 0
-  for( stage in rev(rownames(geneCountsByCategory)) ){
-    cat(stage, "\n")
-    total_genes <- sum(geneCountsByCategory[stage, ])
-    height[c(j,j-1)] <- total_genes
-    labels[j] <- as.character(geneCountsByCategory[stage, 'Characterised Genes'])
-    pc_un <- sprintf('%.1f%%', geneCountsByCategory[stage, 'Uncharacterised Genes']/total_genes*100)
-    labels[j-1] <- paste0(geneCountsByCategory[stage, 'Uncharacterised Genes'], ' (',
-                          pc_un, ')')
-    y[c(j,j-1)] <- total_genes/2 + height_offset
-    height_offset <- height_offset + total_genes
-    j <- j - 2
-  }
+x <- rep( c(2, 0.5), rows )
+j <- 2 * rows
+width <- rep( c(2,1), rows )
+height <- numeric( length = j )
+y <- numeric(length = j)
+labels <- character(length = j)
+# go through stages backwards. from 0 on the plot
+height_offset <- 0
+for( stage in rev(rownames(geneCountsByCategory)) ){
+  # cat(stage, "\n")
+  total_genes <- sum(geneCountsByCategory[stage, ])
+  height[c(j,j-1)] <- total_genes
+  labels[j] <- as.character(geneCountsByCategory[stage, 'Characterised Genes'])
+  pc_un <- sprintf('%.1f%%', geneCountsByCategory[stage, 'Uncharacterised Genes']/total_genes*100)
+  labels[j-1] <- paste0(geneCountsByCategory[stage, 'Uncharacterised Genes'], ' (',
+                        pc_un, ')')
+  y[c(j,j-1)] <- total_genes/2 + height_offset
+  height_offset <- height_offset + total_genes
+  j <- j - 2
+}
 tableTilePlotData <- data.frame( x = x, y = y, 
                                  width = width, height = height, labels = labels )
 
@@ -1733,119 +1736,7 @@ dev.off()
 
 ```
 
-#### ZFA enrichment
-
-```{r loadZFAData}
-ZFADataFile <- file.path(rootPath, 'dataFiles', 'zfa.all.sig.tsv')
-ZFAData <- read.table(ZFADataFile, header=TRUE, sep="\t")
-
-# set levels of stage factor
-ZFAData$Stage <- factor( ZFAData$Stage,
-                         levels(rnaseqSampleInfo$stageName) )
-
-# set levels of Germlayer
-ZFAData$Germlayer <- factor( as.character(ZFAData$Germlayer),
-                             levels = c("ectoderm", "mesoderm", "endoderm",
-                                        "yolk-derived", "NULL") 
-                            )
-
-# set levels of Tissue
-ZFAData$Tissue <- factor( as.character( ZFAData$Tissue ),
-                          levels = c("ectoderm cell", "epidermis", "neural", "neural crest",
-                            "hypoblast", "organizer", "hatching gland", 
-                            "muscle", "notochord", "mesenchyme", 
-                            "skeleton", "cartilage", 
-                            "haematopoietic system", "kidney", "spleen",
-                            "reproductive system", "fin",
-                            "endoderm cell", "endocrine system", "gut",
-                            "liver", "yolk", "YSL", "yolk ball/extension", "NULL"
-                            )
-)
-
-# calculate log2FC enrichment
-ZFAData$log2FCEnriched <- log2( ZFAData$Significant/ZFAData$Expected )
-
-```
-
-```{r heatmap_pvalue_germlayer}
-# make matrix of pvalues
-ZFAData.germlayer.p <- ddply(ZFAData, .(Stage, Germlayer), 
-                             summarise, minP = min(p.adjusted) )
-ZFAData.germlayer.p.c <- acast( ZFAData.germlayer.p, 
-                                Germlayer ~ Stage, 
-                                value.var = "minP", fill = 1) # 1 becomes 0 when logged
-# log 10
-ZFAData.germlayer.p.c <- log10(ZFAData.germlayer.p.c)
-# remove NULL row
-ZFAData.germlayer.p.c <- ZFAData.germlayer.p.c[ !grepl("NULL", rownames(ZFAData.germlayer.p.c) ), ]
-
-```
-
-```{r heatmap_pvalue_tissue}
-# make matrix of pvalues
-ZFAData.tissue.p <- ddply(ZFAData, .(Stage, Tissue), 
-                             summarise, minP = min(p.adjusted) )
-ZFAData.tissue.p.c <- acast( ZFAData.tissue.p, 
-                                Tissue ~ Stage, 
-                                value.var = "minP", fill = 1)# 1 becomes 0 when logged
-# log 10
-ZFAData.tissue.p.c <- log10(ZFAData.tissue.p.c)
-# remove NULL row
-ZFAData.tissue.p.c <- ZFAData.tissue.p.c[ !grepl("NULL", rownames(ZFAData.tissue.p.c) ), ]
-
-```
-
-```{r exprHeatmapMatched, include=TRUE}
-ZFAData.germlayer.p.m <- melt( ZFAData.germlayer.p.c )
-colnames(ZFAData.germlayer.p.m) <- c('Category', 'Stage', 'log10pvalue')
-
-ZFAData.tissue.p.m <- melt(ZFAData.tissue.p.c)
-colnames(ZFAData.tissue.p.m) <- c('Category', 'Stage', 'log10pvalue')
-
-ZFAData.category.p.m <- rbind( ZFAData.germlayer.p.m, ZFAData.tissue.p.m)
-ZFAData.category.p.m.List <- split(ZFAData.category.p.m, ZFAData.category.p.m$Category)
-createTilePlotData <- function( index, ZFAData.category.p.m.List ){
-  data <- ZFAData.category.p.m.List[[index]]
-  rows <- nrow(data)
-  x <- rep( index - 0.5, rows )
-  width <- rep( 1, rows )
-  height <- numeric( length = rows )
-  j <- rows
-  # go through stages backwards. from 0 on the plot
-  offset <- 0
-  y <- vector(length = rows)
-  for( stage in levels( ZFAData.category.p.m.List[[index]]$Stage )[ order( seq_len(rows), decreasing = TRUE ) ] ){
-    # height[j] <- countTotals[ levels(rnaseqSampleInfo$stageName) == stage ][1]
-    height[j] <- ncol( tpmByStage[[ which(levels(rnaseqSampleInfo$stageName) == stage) ]] )
-    y[j] <- height[j]/2 + offset
-    offset <- offset + height[j]
-    j <- j - 1
-  }
-  cbind( data, x, y, width, height )
-}
-
-tilePlotDataList <- lapply( seq_len(length(ZFAData.category.p.m.List)),
-        createTilePlotData,
-        ZFAData.category.p.m.List
-)
-tilePlotData <- do.call( rbind, tilePlotDataList )
-
-pvalueCombinedHeatmap <- ggplot( data = tilePlotData ) + 
-  geom_tile( aes( x = Category, y = y, height = height, fill = log10pvalue ),
-             colour = "grey70" ) + 
-  scale_fill_gradientn( colours = c("red", "orange", "yellow", "white"),
-                        guide = guide_colorbar(title = "log10 p-value") ) + 
-  theme_void() + theme( legend.title = element_text(colour="black") )
-
-# add to plot list
-pdf( file.path(rootPath, 'plots', 'Figure.3-1.zfa-heatmap.pdf') )
-print(pvalueCombinedHeatmap)
-dev.off()
-```
-
-```{r goEnrichment}
-# do Go enrichment on genes assigned to each stage by max mean expression
-
+```{r goEnrichment_func}
 # # function to return sig genes by 'pvalue'
 # topDiffGenes <- function(allScore) {
 #   return(allScore < sigLevel)
