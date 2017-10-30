@@ -481,6 +481,140 @@ dev.off()
 
 ```
 
+```{r genes_detected_downsample}
+downsampled_counts_file <- file.path(rootPath, 'dataFiles', 'rnaseq', 'zfs-rnaseq-grcz10-85-downsample.tsv')
+downsampled_count_data <- read.delim(downsampled_counts_file)
+
+# order by stage
+downsampled_counts <- as.matrix(downsampled_count_data[, as.character(rnaseqSampleInfo$sample)])
+rownames(downsampled_counts) <- downsampled_count_data[, 1]
+
+# convert to tpm and filter
+downsampled_tpm <- counts_to_tpm(downsampled_counts, TxLengths, insertSizes)
+
+# divide data up by Gene and then Stage
+downsampled_tpmByGeneList <- split.data.frame(downsampled_tpm, 
+                                  factor(rownames(downsampled_tpm), 
+                                          levels = rownames(downsampled_tpm))
+                                  )
+downsampled_tpmByGeneByStageList <- lapply(downsampled_tpmByGeneList,
+                               function(x){ 
+                                 split.data.frame(t(x), rnaseqSampleInfo$stageName) } )
+
+# filter to genes with non-zero TPM in all replicates at at least one stage
+tpmThreshold <- 0
+downsampled_genesAboveThreshold <- sapply( downsampled_tpmByGeneByStageList,
+                               function(geneByStageList){
+                                 any( sapply(geneByStageList, 
+                                             function(x){ all(x > tpmThreshold) } ) )
+                               }
+                        )
+downsampled_tpmFilt <- downsampled_tpm[downsampled_genesAboveThreshold, ]
+
+rnaseqTpmThreshold_vec <- c(0.001, 0.01, 0.1, 1)
+pdf('plots/genes_detected_by_threshold-downsampled.pdf')
+for( rnaseqTpmThreshold in rnaseqTpmThreshold_vec ){
+  downsampled_rnaseqGenesDetectedByStage <- apply(downsampled_tpmFilt, 2, function(col){ sum(col >= rnaseqTpmThreshold) } )
+  downsampled_rnaseqGenesDetected.m <- melt(downsampled_rnaseqGenesDetectedByStage)
+  downsampled_rnaseqGenesDetected <- data.frame(
+    sample = rownames(downsampled_rnaseqGenesDetected.m),
+    genes = downsampled_rnaseqGenesDetected.m$value
+  )
+  downsampled_rnaseqGDData <- merge(downsampled_rnaseqGenesDetected, rnaseqSampleInfo)
+  
+  numGenesPlotRNAseq <- ggplot(data = downsampled_rnaseqGDData, aes(x = stageName, y = genes) ) +
+    geom_boxplot(outlier.shape=NA, size = 0.2 ) +
+    labs(x="Stage", y=paste0("Genes Detected (>= ", rnaseqTpmThreshold, " TPM)") ) +
+    theme_minimal() +
+    theme( axis.text.x = element_text(colour = "black", angle = 90, vjust = 0.4, hjust = 1) )
+  
+  print(numGenesPlotRNAseq)
+}
+dev.off()
+
+```
+
+```{r tpm_dist_by_sample}
+xLowLim <- floor(log2(min(tpmFilt[ tpmFilt > 0 ])))
+xHighLim <- ceiling(log2(max(tpmFilt)))
+tpm_dist_list <- lapply(rnaseqSampleInfo$sampleName,
+                        function(sample){
+                          dist_data <- as.data.frame(tpmFilt[ , colnames(tpmFilt) == sample ])
+                          colnames(dist_data) <- 'tpm'
+                          ggplot(data=dist_data, 
+                                 aes(x = tpm) ) +
+                            geom_histogram( breaks = seq(xLowLim,xHighLim,1), 
+                                            closed = 'right' ) + 
+                            scale_x_continuous(trans = log2_trans())
+                        })
+pdf('plots/tpm_dist_indiv_samples.pdf')
+print(tpm_dist_list)
+tpmFilt.m <- melt(tpmFilt)
+ggplot(data=tpmFilt.m, aes(x = value) ) +
+  geom_histogram( breaks = seq(xLowLim,xHighLim,1), 
+                    closed = 'right' ) + 
+  geom_vline(xintercept = 1) +
+  scale_x_continuous(trans = log2_trans()) +
+  facet_wrap(~ Var2, nrow = 9)
+
+ggplot(data=tpmFilt.m[ grepl('1$', tpmFilt.m$Var2), ], aes(x = value) ) +
+  geom_histogram( breaks = seq(xLowLim,xHighLim,1), 
+                    closed = 'right' ) + 
+  geom_vline(xintercept = 1) +
+  scale_x_continuous(trans = log2_trans()) +
+  facet_wrap(~ Var2, ncol = 5)
+
+dev.off()
+
+rnaseqTpmThreshold <- 1
+num_stages <- nlevels(rnaseqSampleInfo$stageName)
+a_not_b <- integer(length = num_stages - 1)
+a_and_b <- integer(length = num_stages - 1)
+b_not_a <- integer(length = num_stages - 1)
+for( i in seq_len(nlevels(rnaseqSampleInfo$stageName) - 1)){
+  first_stage_data <- melt(tpmFilt[ , grepl(levels(rnaseqSampleInfo$stageName)[i], colnames(tpmFilt)) ])
+  next_stage_data <- melt(tpmFilt[ , grepl(levels(rnaseqSampleInfo$stageName)[i + 1], colnames(tpmFilt)) ])
+  
+  a_genes_above_theshold <- unique(first_stage_data[ first_stage_data$value >= rnaseqTpmThreshold, 'Var1' ])
+  b_genes_above_theshold <- unique(next_stage_data[ next_stage_data$value >= rnaseqTpmThreshold, 'Var1' ])
+  a_not_b[i] <- length(setdiff(a_genes_above_theshold, b_genes_above_theshold))
+  a_and_b[i] <- length(intersect(a_genes_above_theshold, b_genes_above_theshold))
+  b_not_a[i] <- length(setdiff(b_genes_above_theshold, a_genes_above_theshold))
+}
+
+venn_numbers <- data.frame(
+  stage1 = levels(rnaseqSampleInfo$stageName)[1:(num_stages - 1)],
+  stage2 = levels(rnaseqSampleInfo$stageName)[2:num_stages],
+  stage1_not_stage2 = a_not_b,
+  stage1_and_stage2 = a_and_b,
+  stage2_not_stage1 = b_not_a
+)
+
+names(venn_numbers) <- c('stage1', 'stage2', 'lost', 'common', 'gained')
+venn_numbers$lost <- -venn_numbers$lost
+venn_numbers.m <- melt(venn_numbers, variable.name = 'category', value.name = 'num_genes',
+                       id.vars = c('stage1', 'stage2'))
+# remove common category
+venn_numbers.m <- venn_numbers.m[ venn_numbers.m$category != 'common', ]
+venn_numbers.m$stages <- paste(venn_numbers.m$stage1, venn_numbers.m$stage2,
+                               sep = '-')
+venn_numbers.m$stages <- factor(venn_numbers.m$stages,
+                                levels = rev(unique(venn_numbers.m$stages)))
+
+png(file = file.path(rootPath, 'plots', 'genes_lost_vs_gained_by_stage.png'),
+    width = 480, height = 240)
+pdf(file = file.path(rootPath, 'plots', 'genes_lost_vs_gained_by_stage.pdf'),
+    width = 8, height = 4)
+ggplot(data = venn_numbers.m) + 
+  geom_col(aes(x = stages, y = num_genes, fill = category)) + 
+  coord_flip() + 
+  scale_fill_manual(values = cb_palette[2:3])
+dev.off()
+
+write.table(venn_numbers, file = file.path(rootPath, 'output', 'genes_by_stage_venn.tsv'),
+            row.names = FALSE, quote = FALSE, sep = "\t")
+```
+
 ### Fig. S1c
 
 #### Distribution of mean TPM by stage
