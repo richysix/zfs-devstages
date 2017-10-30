@@ -2141,222 +2141,493 @@ dev.off()
 
 ```
 
-```{r load_biolayout_zfa_data}
-zfa_file <- file.path(rootPath, 'output', 'zfa', '0.94-e85', 'zfa.e85.sig.tsv')
-biolayout_zfa_data <- read.table(zfa_file, sep = "\t", header=TRUE, quote = "\"")
+```{bash biolayout_go_zfa}
+# run R script to create GO/ZFA html files
+Rscript make_go_zfa_summary.R
 ```
 
-### Figure 3-1
+```{r chr_by_stage}
+names(genesInClustersList) <- levels(rnaseqSampleInfo$stageName)
 
-#### Orthologues of Named/Unnamed genes
+chr_freq_by_stage <- do.call(rbind,
+  lapply(names(genesInClustersList),
+       function(stage){
+         do.call(rbind,
+                  lapply(c('Characterised Genes', 'Uncharacterised Genes'), 
+                    function(name, stage){
+                    named_status <- ifelse(name == 'Characterised Genes', 'Named', 'Unnamed')
+                    genes <- genesInClustersList[[stage]][[name]]
+                    info <- AllGenesInfo[genes, ]
+                    df <- as.data.frame(table(info$chromosome_name))
+                    df$stage <- rep(stage, nrow(df))
+                    df$named <- rep(named_status, nrow(df))
+                    df <- df[ df$Freq > 1, ]
+                    df[ order(df$Freq, decreasing = TRUE), ][1:10,]
+                  },
+                  stage
+                  )
+        )
+       }
+  )
+)
 
-```{bash, eval=FALSE}
-perl ~/checkouts/team31/scripts/count_orthologues.pl \
---species_list species_list.txt \
-genes.orthologues.tsv > output/orthologue_counts.bystage.tsv
-
-# join to annotation and class as named or unnamed
-sort -t$'\t' -k1,1 output/orthologue_counts.bystage.tsv | \
-join -t$'\t' - dataFiles/annotation.txt | perl -F"\t" -lane '
-my @patterns = (
-  "^[A-Z][A-Z][0-9]{6}\.[0-9]+\$",
-  "^CABZ[0-9]{8}\.[0-9]+\$",
-  "^im:[0-9]{7}\$",
-  "^si:.*\$",
-  "^wu:.*\$",
-  "^zgc:[0-9]{5,6}\$"
-);
-my $named = 1;
-foreach my $pattern ( @patterns ){ if( $F[10] =~ m/$pattern/ ){ $named = 0; } }
-print join("\t", @F[0..4,10], $named ? "Named" : "Unnamed" );' > output/orthologue_counts.tsv
-
+colnames(chr_freq_by_stage) <- c('Chr', 'Freq', 'stage', 'named')
+write.table(chr_freq_by_stage, file = file.path(rootPath, 'output', 'chr_freq_by_stage.txt'),
+            row.names = FALSE, quote = FALSE, sep = "\t")
 ```
 
-##### Named Genes
+```{bash pfamInfo}
+###################################
+## GET PFAM INFO
+###################################
 
-```{r plot_orthologue_counts, include=TRUE}
-# load data
-orthologueCountFile <- file.path(rootPath, 'output', 'orthologue_counts.tsv')
-orthologueCounts <- read.table(orthologueCountFile, header=FALSE,
-                               sep="\t", col.names = c("geneId", "orthologueId", "species",
-                                                       "lastCommonAncestor", "stage", "geneName",
-                                                       "Named"))
-#' countOrthology
-#' Determine the largest taxonomic group for each gene with orthologues
+# Check for existence of Pfma file
+# If not download it from EBI
+pfamMappingFile='pdb_pfam_mapping.txt'
+pfamFTPLink='ftp://ftp.ebi.ac.uk/pub/databases/Pfam/mappings/pdb_pfam_mapping.txt'
+
+# check for PFAM file
+if [[ ! -e $pfamMappingFile ]]
+then
+  # download from EBI
+  curl -O $pfamFTPLink
+  mv $pfamMappingFile dataFiles/$pfamMappingFile
+fi
+```
+
+```{r getPFAMdomains}
+# get Pfam ID to Description
+pfamMappingFile <- file.path(rootPath, 'dataFiles', 'pdb_pfam_mapping.txt')
+pfamMapping <- read.delim(file=pfamMappingFile, sep="\t", header=TRUE)
+# make named vector of IDs to Description
+pfamDesc <- data.frame(
+  pfam = gsub("\\.[0-9]+", "", pfamMapping$PFAM_ACC ),
+  pfamDescription = pfamMapping$PFAM_desc
+)
+# limit to unique rows
+pfamDesc <- unique(pfamDesc)
+```
+
+```{r get_genes_and_pfam_func}
+# connect to ensembl
+# need the correct archive site 85 = jul2016.archive.ensembl.org
+# to connect to the current database use
+# ensBiomart <- useMart( "ensembl", dataset="drerio_gene_ensembl")
+ensBiomart <- useMart(host='jul2016.archive.ensembl.org', biomart = "ENSEMBL_MART_ENSEMBL", dataset="drerio_gene_ensembl")
+
+#' getGenesForRegion
+#' Function to extract the genes within a genomic range
 #' 
-#' Takes a data.frame for a gene id containing all the orthologues for
-#'    that gene from Ensembl and determines the oldest last common ancestor
-#'    out of 'Vertebrates', 'Teleosts' and 'Danio'
+#' Uses the supplied GenesInfo data.frame to get information for all the genes 
+#' within the supplied genomic range
 #'    
-#' @param geneSubset data.frame, with columns 
-#'    "geneId"
-#'    "orthologueId"
-#'    "species"
-#'    "lastCommonAncestor"
-#'    "stage"
-#'    "geneName"
-#'    "Named"
+#' @param chr character, name of the chromosome
+#' @param start integer, start of the region (default: 1)
+#' @param end integer, end of the region (default: max position for the chr in the data)
+#' @param GenesInfo data.frame, Genes Info data from with 
+#'        columns chromosome_name, start_position and end_position
 #'
-#' @return data.frame, containing columns 'geneId', 'stage', 'Phylum', 'Named'
+#' @return data.frame, gene info from Ensembl with geneId, gene name, chr, start and end
 #'
-countOrthology <- function( geneSubset ){
-  # LCA <- ''
-  Phylum <- ''
-  if( sum(geneSubset$lastCommonAncestor == 'Euteleostomi') > 0 |
-      sum(geneSubset$lastCommonAncestor == 'Vertebrata') > 0 |
-      sum(geneSubset$lastCommonAncestor == 'Chordata') > 0 |
-      sum(geneSubset$lastCommonAncestor == 'Bilateria') > 0 ){
-    # LCA <- 'Euteleostomi'
-    Phylum <- 'Vertebrates'
-  } else if( sum(geneSubset$lastCommonAncestor == 'Neopterygii') > 0 |
-             sum(geneSubset$lastCommonAncestor == 'Clupeocephala') > 0 |
-             sum(geneSubset$lastCommonAncestor == 'Otophysi') > 0 ){
-    # LCA <- 'Neopterygii'
-    Phylum <- 'Teleosts'
-  } else if( sum(geneSubset$lastCommonAncestor == 'Danio') > 0 ){
-    # LCA <- 'Danio'
-    Phylum <- 'Danio'
+getGenesForRegion <- function(chr, start = 1, end = NULL, GenesInfo, sort_by_position = TRUE){
+  if( is.null( end ) ){
+    end <- max( GenesInfo$end_position[ GenesInfo$chromosome_name == chr ] )
   }
-  
-  return(
-    data.frame(
-      geneId = geneSubset$geneId[1],
-      stage = factor( geneSubset$stage[1],
-                      levels = levels(rnaseqSampleInfo$stageName) ),
-      # lastCommonAncestor = factor( LCA,
-      #                               levels = c("Euteleostomi", "Neopterygii", "Clupeocephala", "Otophysi", "Danio" ) ),
-      Phylum = factor( Phylum, levels = c("Vertebrates", "Teleosts", "Danio") ),
-      Named = factor( geneSubset$Named[1],
-                      levels = c("Named", "Unnamed") )
-    )
+  chr_specific_genes <- GenesInfo[ GenesInfo$chromosome_name == chr & 
+                                 GenesInfo$start_position >= start & 
+                                 GenesInfo$end_position <= end, ]
+  if( sort_by_position ){
+    chr_specific_genes <- chr_specific_genes[ order(chr_specific_genes$start_position), ]
+  }
+  return( chr_specific_genes )
+}
+
+#' getPfamForGenes
+#' Function to get information on PFAM domains for a list of genes
+#' 
+#' Retrieves PFAM domain information for the genes in the supplied list
+#'    
+#' @param biomartObj, biomaRt object from connecting to Ensembl bioMart
+#' @param genes character, list of Ensembl gene ids
+#' @param pfamDesc data.frame, mapping of PFAM accession numbers to descriptions
+#'
+#' @return data.frame, contains information on the genes and the associated PFAM domains
+#'
+getPfamForGenes <- function( biomartObj, genes, pfamDesc ){
+  # get gene/Pfam info from Biomart
+  genes_Pfam_domains <- getBM( 
+    filters = "ensembl_gene_id",
+    attributes = c('ensembl_gene_id', 'external_gene_name', 'pfam'),
+    values = as.character( genes ),
+    mart = biomartObj
+  )
+  # merge to Descriptions and get unqiue rows
+  Pfam_plusDesc <- merge(genes_Pfam_domains, pfamDesc, all.x = TRUE)
+  Pfam_plusDesc <-  unique(Pfam_plusDesc[, 1:4 ])
+  return(Pfam_plusDesc)
+}
+
+get_lca_for_genes <- function(genes, species, biomartObj){
+  homologues_for <- getBM( 
+    filters = "ensembl_gene_id",
+    attributes = c('ensembl_gene_id',
+      paste0(species, '_homolog_subtype')
+    ),
+    values = as.character( genes ),
+    mart = biomartObj
   )
 }
 
-orthologueCount <- do.call("rbind",
-  lapply( split(orthologueCounts, orthologueCounts$geneId),
-        countOrthology
+species_list <- c('hsapiens', 'mmusculus', 'rnorvegicus',
+             'amexicanus', 'gmorhua', 'trubripes','olatipes',
+             'gaculeatus', 'tnigroviridis')
+get_largest_phylum <- function(gene_list, species_list, ensBiomart){
+  lca_for_genes <- lapply(species_list, function(species){
+    get_lca_for_genes(gene_list, species, ensBiomart)
+  })
+  lca_list <- lapply(lca_for_genes, function(x){ x[[2]] })
+  phylum_list <- rep('Danio', length(lca_list[[1]]))
+  teleosts <- Reduce('|', 
+                  lapply(lca_list, 
+                    function(x){ x == 'Neopterygii' | x == 'Clupeocephala' | 
+                        x == 'Otophysi' }) )
+  phylum_list[teleosts] <- 'Teleosts'
+  vertebrates <- Reduce('|', 
+                  lapply(lca_list, 
+                    function(x){ x == 'Euteleostomi' | x == 'Vertebrata' | 
+                        x == 'Chordata' | x == 'Bilateria' }) )
+  phylum_list[vertebrates] <- 'Vertebrates'
+  return(data.frame(gene_id = lca_for_genes[[1]][[1]],
+                    phylum = phylum_list) )
+}
+
+lca_info <- lapply(genesInClustersList, 
+                   function(x){ lapply(x, get_largest_phylum, species_list, ensBiomart) }
+)
+
+# convert to data frame and add pfam info
+names(lca_info) <- levels(rnaseqSampleInfo$stageName)
+lca_info_df <- do.call(rbind, 
+  do.call(rbind,
+    lapply(names(lca_info),
+       function(stage){
+         lapply(c('Characterised Genes', 'Uncharacterised Genes'), function(name, stage){
+           df <- lca_info[[stage]][[name]]
+           named_status <- ifelse(name == 'Characterised Genes', 'Named', 'Unnamed')
+           data.frame(
+             gene_id = df$gene_id,
+             stage = rep(stage, nrow(df)),
+             named = rep(named_status, nrow(df)),
+             phylum = df$phylum
+           )
+         }, stage )
+       })
   )
 )
 
-countsByStageByPhylumByNamed <- ddply( orthologueCount, .(stage, Phylum, Named), summarise, count = length(Phylum) )
-countsSplitByStageByNamed <- split(countsByStageByPhylumByNamed, list(countsByStageByPhylumByNamed$stage, countsByStageByPhylumByNamed$Named))
-pcCountsByStageByNamed <- do.call("rbind",
-                                  lapply(countsSplitByStageByNamed,
-                                      function(x){ x$pcGenes <- x$count/sum(x$count)
-                                      return(x)
-                                        })
+genes_by_stage_by_named_by_phylum <- 
+  ddply(lca_info_df, .(stage, named, phylum), summarise, count = length(gene_id))
+
+genes_by_stage_by_named_list <- split(genes_by_stage_by_named_by_phylum,
+      interaction(genes_by_stage_by_named_by_phylum$stage,
+                  genes_by_stage_by_named_by_phylum$named) )
+
+genes_by_stage_by_named_by_phylum <- 
+  do.call(rbind,
+        lapply(genes_by_stage_by_named_list,
+          function(x){
+            x$pc_count <- x$count / sum(x$count)
+            return(x)
+          }
+        )
 )
-NamedStackedPC <- ggplot( data = pcCountsByStageByNamed[ pcCountsByStageByNamed$Named == "Named", ] ) + 
-  geom_bar( aes( x = stage, y = pcGenes, fill = Phylum ), stat = "identity" ) + 
+
+NamedStackedPC <- ggplot( data = genes_by_stage_by_named_by_phylum[ genes_by_stage_by_named_by_phylum$named == "Named", ] ) + 
+  geom_col( aes( x = stage, y = pc_count, fill = phylum ) ) + 
   scale_y_continuous(labels = scales::percent) + 
   guides(fill = guide_legend(reverse = TRUE)) +
   labs( x = "Stage", y = "% of Genes") +
   theme( axis.text.x = element_text(angle = 45, hjust = 1) )
 
 # add positions to data frame to plot percentages on bars
-unnamedSubset <- pcCountsByStageByNamed[ pcCountsByStageByNamed$Named == "Unnamed", ]
+unnamedSubset <- genes_by_stage_by_named_by_phylum[ genes_by_stage_by_named_by_phylum$named == "Unnamed", ]
 unnamedSubset$label_y <- integer( length = nrow(unnamedSubset) )
-unnamedSubset$label_y[ unnamedSubset$Phylum == "Vertebrates" ] <- 0.1
-unnamedSubset$label_y[ unnamedSubset$Phylum == "Teleosts" ] <- 0.5
-unnamedSubset$label_y[ unnamedSubset$Phylum == "Danio" ] <- 0.95
-unnamedSubset$label = as.character( round( unnamedSubset$pcGenes * 100, digits = 1 ) )
+unnamedSubset$label_y[ unnamedSubset$phylum == "Vertebrates" ] <- 0.1
+unnamedSubset$label_y[ unnamedSubset$phylum == "Teleosts" ] <- 0.5
+unnamedSubset$label_y[ unnamedSubset$phylum == "Danio" ] <- 0.95
+unnamedSubset$label = as.character( round( unnamedSubset$pc_count * 100, digits = 1 ) )
 
 UnnamedStackedPC <- ggplot( data = unnamedSubset ) + 
-  geom_bar( aes( x = stage, y = pcGenes, fill = Phylum ), stat = "identity" ) + 
+  geom_col( aes( x = stage, y = pc_count, fill = phylum ) ) + 
   geom_text( aes( x = stage, y = label_y, label = label ), size = 2 ) +
   scale_y_continuous(labels = scales::percent) + 
-  guides(fill = guide_legend(reverse = TRUE)) +
   labs( x = "Stage", y = "% of Genes") +
   theme( axis.text.x = element_text(angle = 45, hjust = 1 ) )
 
-# add to plot list
-plotList <- add_to_plot_list( plotList, 
-                              NamedStackedPC, 
-                              file.path(rootPath, 'plots', 'Figure3-1-a.pdf') )
-plotList <- add_to_plot_list( plotList, 
-                              UnnamedStackedPC, 
-                              file.path(rootPath, 'plots', 'Figure3-1-b.pdf') )
+# Look at Pfam domains
+pfam_for_all_genes <- getPfamForGenes(ensBiomart, lca_info_df$gene_id, pfamDesc )
 
-print(NamedStackedPC)
-```
+genes_lca_pfam <- merge(lca_info_df, pfam_for_all_genes, 
+                        by.x = 'gene_id', by.y = 'ensembl_gene_id', all.x = TRUE)
 
-##### Unnamed Genes
+genes_lca_pfam_counts <- ddply(genes_lca_pfam, .(stage, named, phylum, pfam, pfamDescription),
+                               summarise, count = length(pfam) )
 
-```{r plot_orthologue_counts_unnamed, include=TRUE}
-print(UnnamedStackedPC)
-```
+# lca_pfam_data: subset of the data by stage, named and phylum
+other_threshold <- 10
+count_up_genes <- function(lca_pfam_data, other_threshold){
+  lca_pfam_data_counts <- ddply(lca_pfam_data, .(stage, named, phylum, pfam, pfamDescription),
+                               summarise, count = length(pfam) )
+  # remove NA
+  lca_pfam_counts_no_na <- lca_pfam_data_counts[ !is.na(lca_pfam_data_counts$pfam), ]
+  
+  # split into Znf, above and belowthreshold
+  zinc_finger_domains <- c('PF00096', 'PF12874', 'PF13465', 'PF13894', 'PF13912')
+  znf_genes <- lca_pfam_data$gene_id[ Reduce('|', lapply(zinc_finger_domains, function(x){lca_pfam_data$pfam == x}) ) ]
+  znf_count <- length(unique(znf_genes[!is.na(znf_genes)]))
+  if( znf_count >= other_threshold ){
+    # remove from counts
+    lca_pfam_counts_no_na <- lca_pfam_counts_no_na[ !Reduce('|', lapply(zinc_finger_domains, function(x){lca_pfam_counts_no_na$pfam == x}) ), ]
+    # create new line
+    znf_counts <- data.frame(
+                    stage = lca_pfam_counts_no_na$stage[1],
+                    named = lca_pfam_counts_no_na$named[1],
+                    phylum = lca_pfam_counts_no_na$phylum[1],
+                    pfam = 'ZnF',
+                    pfamDescription = 'Zinc Finger',
+                    count = znf_count
+    )
+  } else{
+    znf_counts <- data.frame()
+  }
+  
+  # split into above and below threshold
+  above_threshold_pfam <- lca_pfam_counts_no_na$count >= other_threshold
+  # count up unique genes for other
+  other_pfam <- lca_pfam_counts_no_na$pfam[!above_threshold_pfam]
+  other_gene_ids <- lca_pfam_data$gene_id[ Reduce('|', lapply(other_pfam, function(x){ lca_pfam_data$pfam == x })) ]
+  other_counts <- 
+    data.frame(
+      stage = lca_pfam_counts_no_na$stage[1],
+      named = lca_pfam_counts_no_na$named[1],
+      phylum = lca_pfam_counts_no_na$phylum[1],
+      pfam = 'Other',
+      pfamDescription = 'Other',
+      count = length(unique(other_gene_ids[!is.na(other_gene_ids)]))
+    )
+  
+  pfam_counts <- rbind(
+    lca_pfam_counts_no_na[ above_threshold_pfam, ],
+    znf_counts,
+    other_counts,
+    lca_pfam_data_counts[ is.na(lca_pfam_data_counts$pfam), ]
+  )
+  pfam_counts$percent <- pfam_counts$count / sum(pfam_counts$count)
+  
+  return(pfam_counts)
+}
 
-### Figure 3-2
+lca_pfam_by_stage_named_phylum <- split(genes_lca_pfam, interaction(genes_lca_pfam$stage, genes_lca_pfam$named, genes_lca_pfam$phylum))
+lca_pfam_unique_genes <- do.call(rbind, lapply(lca_pfam_by_stage_named_phylum, count_up_genes, other_threshold) )
 
-#### Effect of Normalisation on cluster 11
-
-```{r normalisation_check, include=TRUE, eval=FALSE}
-dataFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'spikes-counts.txt')
-spikesData <- read.table(dataFile, sep="\t", header=TRUE, quote = "\"",
-                         row.names = 1 )
-
-# relabel colnames with sample names
-colnames(spikesData) <- rownames(rnaseqSampleInfo)
-
-# make DESeq object and estimate size factors
-spikesDESeqDataSet <- DESeqDataSetFromMatrix(spikesData, rnaseqSampleInfo, design = ~ condition)
-spikesDESeqDataSet <- estimateSizeFactors(spikesDESeqDataSet)
-
-# replace size factors in dds with the spike-derived ones
-ddsSpikeNormalised <- dds
-sizeFactors(ddsSpikeNormalised) <- sizeFactors(spikesDESeqDataSet)
-
-cluster11tpm <- tpm[ rownames( cluster_data[ cluster_data$cluster == "Cluster011", ] ), ]
-# center and scale. scale works on columns. 
-# need to transpose, scale then transpose back to scale rows (genes).
-cluster11tpmScaled <- t( scale( t(cluster11tpm) ) )
-cluster11tpmMeanByStage <- data.frame(
-  Sample = factor( colnames(cluster11tpm),
-                   levels = rnaseqSampleInfo$sampleName),
-  Measure = rep("TPM", ncol(cluster11tpm)),
-  Mean = colMeans(cluster11tpmScaled)
+# count up unnamed genes by stage
+lca_pfam_by_stage <- split(lca_pfam_unique_genes, lca_pfam_unique_genes$stage)
+frac_znf_by_stage <- sapply(lca_pfam_by_stage,
+       function(x){
+         znf <- sum( x$count[x$named == 'Unnamed' & x$pfam == 'ZnF' & !is.na(x$pfam)])
+         all <- sum( x$count[x$named == 'Unnamed'])
+         znf/all
+       }
 )
 
-cluster11NormCounts <- counts(dds, normalized = TRUE )[ rownames( cluster_data[ cluster_data$cluster == "Cluster011", ] ), ]
-# center and scale. scale works on columns. 
-cluster11NormCountsScaled <- t( scale( t(cluster11NormCounts) ) )
-cluster11NormCountsMeanByStage <- data.frame(
-  Sample = factor( colnames(cluster11NormCounts),
-                   levels = rnaseqSampleInfo$sampleName),
-  Measure = rep("Library Size", ncol(cluster11NormCounts)),
-  Mean = colMeans(cluster11NormCountsScaled)
-)
+# set colours
+numLevels <- nlevels(lca_pfam_unique_genes$pfam)
+ord1 <- seq(1,numLevels,2)
+ord2 <- seq(2,numLevels,2)
+stacked_bar_palette <- hue_pal()(numLevels)[ order(c(ord1,ord2)) ]
+stacked_bar_palette[1:2] <- cb_palette[c(2,1)]
 
-cluster11SpikeNormCounts <- counts(ddsSpikeNormalised, normalized = TRUE )[ rownames( cluster_data[ cluster_data$cluster == "Cluster011", ] ), ]
-# center and scale. scale works on columns. 
-cluster11SpikeNormCountsScaled <- t( scale( t(cluster11SpikeNormCounts) ) )
-cluster11SpikeNormCountsMeanByStage <- data.frame(
-  Sample = factor( colnames(cluster11SpikeNormCounts),
-                   levels = rnaseqSampleInfo$sampleName),
-  Measure = rep("ERCC spikes", ncol(cluster11SpikeNormCounts)),
-  Mean = colMeans(cluster11SpikeNormCountsScaled)
-)
+stacked_bar_pfam_phylum_percent <- ggplot(data = lca_pfam_unique_genes) + 
+  geom_col( aes(x = stage, y = percent, fill = pfam) ) + 
+  scale_fill_manual(values = stacked_bar_palette, na.value = 'grey70') + 
+  coord_flip() + facet_wrap(~ named + phylum)
 
-normalisationData <- rbind( cluster11tpmMeanByStage, 
-                            # cluster11CountsMeanByStage,
-                            cluster11NormCountsMeanByStage, 
-                            cluster11SpikeNormCountsMeanByStage )
-normalisationData$Measure <- factor(normalisationData$Measure,
-                                    levels = c("TPM", "ERCC spikes", "Library Size") )
-
-cluster11Linegraph <- ggplot( data = normalisationData ) + 
-  geom_line( aes( x = Sample, y = Mean, colour = Measure, group = Measure ), 
-             size = 1 ) + 
-  scale_colour_manual(values=c("steelblue3", "firebrick3", "#D3C04A")) +
-  theme_minimal() + theme( axis.text.x = element_text(angle=90, hjust=1, size=rel(0.5)),
-                           legend.position = "top" ) +
-  labs(y='Mean (Centred and Variance Scaled)' )
-
-pdf(file.path(rootPath, 'plots', 'Figure.3-2.pdf'))
-print(cluster11Linegraph)
+pdf(file = file.path(rootPath, 'plots', 'stacked_bar_unique_named_phylum.pdf'), 
+    width = 11, height = 8)
+print(stacked_bar_pfam_phylum_percent + theme(legend.position = 'none'))
 dev.off()
 
-print(cluster11Linegraph)
+# add together anything under 10 into an other category that isn't NA
+other_threshold <- 10
+genes_lca_pfam_counts_other <- ddply(genes_lca_pfam_counts[ genes_lca_pfam_counts$count < other_threshold & !is.na(genes_lca_pfam_counts$pfam), ], 
+                                     .(stage, named, phylum), summarise, count = sum(count) )
+# add pfam and pfamDescription columns
+genes_lca_pfam_counts_other$pfam <- rep('Other', nrow(genes_lca_pfam_counts_other))
+genes_lca_pfam_counts_other$pfamDescription <- rep(NA, nrow(genes_lca_pfam_counts_other))
+# reorder columns
+genes_lca_pfam_counts_other <- genes_lca_pfam_counts_other[,c(1:3,5,6,4)]
+
+# join back to domains over 10
+genes_lca_pfam_counts_summary <- rbind(genes_lca_pfam_counts[ genes_lca_pfam_counts$count >= other_threshold | 
+                                                                is.na(genes_lca_pfam_counts$pfam), ],
+                                       genes_lca_pfam_counts_other)
+
+stacked_bar_pfam <- ggplot(data = genes_lca_pfam_counts_summary) + 
+  geom_col( aes(x = stage, y = count, fill = pfam) ) + 
+  coord_flip() + facet_wrap(~ named) + 
+  theme(legend.position = "none") 
+
+stacked_bar_pfam_phylum <- ggplot(data = genes_lca_pfam_counts_summary) + 
+  geom_col( aes(x = stage, y = count, fill = pfam) ) + 
+  coord_flip() + facet_wrap(~ named + phylum) + 
+  theme(legend.position = "none") 
+
+# convert to percentage
+# split by named and phylum and calculate percentages
+genes_lca_pfam_counts_summary_by_named_by_phylum_by_stage <- 
+  split(genes_lca_pfam_counts_summary, interaction(genes_lca_pfam_counts_summary$named, genes_lca_pfam_counts_summary$phylum, genes_lca_pfam_counts_summary$stage))
+
+genes_lca_pfam_counts_summary <- 
+  do.call(rbind,
+    lapply(genes_lca_pfam_counts_summary_by_named_by_phylum_by_stage, 
+           function(df){
+             df$percent <- df$count / sum(df$count)
+             return(df)
+           }
+    )
+  )
+
+stacked_bar_pfam_phylum_percent <- ggplot(data = genes_lca_pfam_counts_summary) + 
+  geom_col( aes(x = stage, y = percent, fill = pfam) ) + 
+  coord_flip() + facet_wrap(~ named + phylum) + 
+  theme(legend.position = "none") 
+
+# print to file
+pdf(file = file.path(rootPath, 'plots', 'stacked_bar_pfam.pdf'))
+print(stacked_bar_pfam)
+print(stacked_bar_pfam_phylum)
+print(stacked_bar_pfam_phylum_percent)
+dev.off()
+
+# aggregate phylum data
+genes_lca_pfam_totals <- ddply(genes_lca_pfam, .(stage, named, pfam, pfamDescription),
+                               summarise, count = length(pfam) )
+
+# add together anything under 10 into an other category that isn't NA
+other_threshold <- 10
+genes_lca_pfam_totals_other <- ddply(genes_lca_pfam_totals[ genes_lca_pfam_totals$count < other_threshold & !is.na(genes_lca_pfam_totals$pfam), ], 
+                                     .(stage, named), summarise, count = sum(count) )
+# add pfam and pfamDescription columns
+genes_lca_pfam_totals_other$pfam <- rep('Other', nrow(genes_lca_pfam_totals_other))
+genes_lca_pfam_totals_other$pfamDescription <- rep(NA, nrow(genes_lca_pfam_totals_other))
+# reorder columns
+genes_lca_pfam_totals_other <- genes_lca_pfam_totals_other[,c('stage', 'named', 'pfam', 'pfamDescription', 'count')]
+
+# join back to domains over 10
+genes_lca_pfam_totals_summary <- rbind(genes_lca_pfam_totals[ genes_lca_pfam_totals$count >= other_threshold | 
+                                                                is.na(genes_lca_pfam_totals$pfam), ],
+                                       genes_lca_pfam_totals_other)
+
+genes_lca_pfam_totals_summary_by_named_by_stage <- 
+  split(genes_lca_pfam_totals_summary, interaction(genes_lca_pfam_totals_summary$named, genes_lca_pfam_totals_summary$stage))
+
+genes_lca_pfam_totals_summary_by_named_by_stage <- 
+  do.call(rbind,
+    lapply(genes_lca_pfam_totals_summary_by_named_by_stage, 
+           function(df){
+             
+             df$percent <- df$count / sum(df$count)
+             return(df)
+           }
+    )
+  )
+
+ggplot(data = genes_lca_pfam_totals_summary_by_named_by_stage[ genes_lca_pfam_totals_summary_by_named_by_stage$named == 'Unnamed', ]) + 
+  geom_col( aes(x = stage, y = percent, fill = pfam) ) + 
+  coord_flip() + 
+  theme(legend.position = "none") 
+
+# remove Other category
+# genes_lca_pfam_counts_summary_no_other <- 
+#   genes_lca_pfam_counts_summary[ genes_lca_pfam_counts_summary$pfam != 'Other' &
+#                                  !is.na(genes_lca_pfam_counts_summary$pfam), ]
+# 
+# stacked_bar_pfam <- ggplot(data = genes_lca_pfam_counts_summary_no_other) + 
+#   geom_col( aes(x = stage, y = percent, fill = pfam) ) + 
+#   coord_flip() + facet_wrap(~ named) + 
+#   theme(legend.position = "none")
+# pdf(file.path(rootPath, 'plots', 'stacked_bar_pfam.pdf'))
+# print(stacked_bar_pfam)
+# dev.off()
+
+
+# check genes that give rise to Znf at 128-cell to 75% epi
+znf_domains <- c('PF00096', 'PF13465', 'PF13894', 'PF13912')
+unnamed_znf_genes <- do.call(rbind,
+                             lapply(znf_domains, 
+                                    function(domain){
+                                      genes_lca_pfam[ genes_lca_pfam$pfam == domain & 
+                                                        genes_lca_pfam$named == 'Unnamed' &
+                                                        !is.na(genes_lca_pfam$pfam), ]
+                                      }
+                                    )
+)
+unnamed_znf_gene_info <- AllGenesInfo[ as.character(unique(unnamed_znf_genes$gene_id)), ]
+chr_counts <- table(unnamed_znf_gene_info$chromosome_name)
+chr_counts <- chr_counts[ chr_counts != 0 & !grepl("^KN", names(chr_counts)) ]
+chr_counts <- melt(chr_counts)
+chr_counts$Var1 <- factor(chr_counts$Var1,
+                          levels = chr_counts$Var1[ order(chr_counts$Var1) ])
+# plot chr counts
+unnamed_znf_chr_dist <- ggplot(data = chr_counts) + geom_col( aes(x = Var1, y = value))
+pdf(file.path(rootPath, 'plots', 'unnamed_znf_chr_dist.pdf'))
+print(unnamed_znf_chr_dist)
+dev.off()
+
+
+genes_lca_pfam_counts_by_stage_by_named <- split(genes_lca_pfam_counts,                                            interaction(genes_lca_pfam_counts$stage,genes_lca_pfam_counts$named) )
+
+domains_over_ten <- do.call(rbind,
+  lapply(genes_lca_pfam_counts_by_stage_by_named,
+       function(x){
+         x <- x[ x$count > 10, ]
+         x[order(x$count, decreasing = TRUE), ]
+       }
+  )
+)
+
+write.table(domains_over_ten, file = file.path(rootPath, 'output', 'pfam_domains_by_stage_by_named.tsv'),
+            sep = "\t", quote = FALSE, row.names = FALSE, col.names = TRUE )
+```
+
+```{r protein_domains_unchar}
+# get protein domains for named/unnamed genes at different stages
+pfam_by_stage_by_named_status <- lapply(genesInClustersList, function(genes_by_named_status) {
+  lapply(genes_by_named_status, 
+         function(genes, ensBiomart, pfamDesc) { getPfamForGenes(ensBiomart, genes, pfamDesc) },
+    ensBiomart,
+    pfamDesc )
+})
+
+# find pfam domains in unnamed genes sets
+pfam_counts_list <- 
+  lapply(pfam_by_stage_by_named_status,
+         function(pfam_for_stage){
+           pfam_counts <- as.data.frame(table(pfam_for_stage[[2]]$pfam))
+           names(pfam_counts) <- c('pfam', 'count')
+           pfam_counts <- merge(pfam_counts, pfamDesc)
+           pfam_counts[order(pfam_counts$count, decreasing = TRUE), ]
+         }
+        )
+names(pfam_counts_list) <- levels(rnaseqSampleInfo$stageName)
+
+lapply(pfam_counts_list,
+        function(x){
+           print(x[x$count > 5, ])
+        }
+)
+
+
 ```
 
 ## Figure 4
@@ -2448,98 +2719,15 @@ kable( sigResults, row.names = FALSE, align = c('l', 'l', 'r', 'r', 'r', 'r', 'r
 Table showing clusters with significant chr enrichments (adjusted p-value < 0.05 and log2 fold change > 1).
 
 # Chr 4 Zinc Finger Genes 
-```{bash pfamInfo}
-###################################
-## GET PFAM INFO
-###################################
-
-# Check for existence of Pfma file
-# If not download it from EBI
-pfamMappingFile='pdb_pfam_mapping.txt'
-pfamFTPLink='ftp://ftp.ebi.ac.uk/pub/databases/Pfam/mappings/pdb_pfam_mapping.txt'
-
-# check for PFAM file
-if [[ ! -e $pfamMappingFile ]]
-then
-  # download from EBI
-  curl -O $pfamFTPLink
-  mv $pfamMappingFile dataFiles/$pfamMappingFile
-fi
-```
-
-```{r getPFAMdomains}
-# get Pfam ID to Description
-pfamMappingFile <- file.path(rootPath, 'dataFiles', 'pdb_pfam_mapping.txt')
-pfamMapping <- read.table(file=pfamMappingFile, sep="\t", header=TRUE)
-# make named vector of IDs to Description
-pfamDesc <- data.frame(
-  pfam = gsub("\\.[0-9]+", "", pfamMapping$PFAM_ACC ),
-  pfamDescription = pfamMapping$PFAM_desc
-)
-# limit to unique rows
-pfamDesc <- unique(pfamDesc)
-```
 
 ```{r get_chr4_genes}
 chr4Region = list( chr = "4", start = 24000000, end = NULL )
 
-# connect to ensembl
-# need the correct archive site 85 = jul2016.archive.ensembl.org
-# to connect to the current database use
-# ensBiomart <- useMart( "ensembl", dataset="drerio_gene_ensembl")
-ensBiomart <- useMart(host='jul2016.archive.ensembl.org', biomart = "ENSEMBL_MART_ENSEMBL", dataset="drerio_gene_ensembl")
-
-#' getGenesForRegion
-#' Function to extract the genes within a genomic range
-#' 
-#' Uses the supplied GenesInfo data.frame to get information for all the genes 
-#' within the supplied genomic range
-#'    
-#' @param chr character, name of the chromosome
-#' @param start integer, start of the region (default: 1)
-#' @param end integer, end of the region (default: max position for the chr in the data)
-#' @param GenesInfo data.frame, Genes Info data from with 
-#'        columns chromosome_name, start_position and end_position
-#'
-#' @return data.frame, gene info from Ensembl with geneId, gene name, chr, start and end
-#'
-getGenesForRegion <- function(chr, start = 1, end = NULL, GenesInfo, sort_by_position = TRUE){
-  if( is.null( end ) ){
-    end <- max( GenesInfo$end_position[ GenesInfo$chromosome_name == chr ] )
-  }
-  chr_specific_genes <- GenesInfo[ GenesInfo$chromosome_name == chr & 
-                                 GenesInfo$start_position >= start & 
-                                 GenesInfo$end_position <= end, ]
-  if( sort_by_position ){
-    chr_specific_genes <- chr_specific_genes[ order(chr_specific_genes$start_position), ]
-  }
-  return( chr_specific_genes )
-}
-
-#' getPfamForGenes
-#' Function to get information on PFAM domains for a list of genes
-#' 
-#' Retrieves PFAM domain information for the genes in the supplied list
-#'    
-#' @param biomartObj, biomaRt object from connecting to Ensembl bioMart
-#' @param genes character, list of Ensembl gene ids
-#' @param pfamDesc data.frame, mapping of PFAM accession numbers to descriptions
-#'
-#' @return data.frame, contains information on the genes and the associated PFAM domains
-#'
-getPfamForGenes <- function( biomartObj, genes, pfamDesc ){
-  # get gene/Pfam info from Biomart
-  genes_Pfam_domains <- getBM( 
-    filters = "ensembl_gene_id",
-    attributes = c('ensembl_gene_id', 'external_gene_name', 'pfam'),
-    values = as.character( genes ),
-    mart = ensBiomart
-  )
-  # merge to Descriptions and get unqiue rows
-  Pfam_plusDesc <- merge(genes_Pfam_domains, pfamDesc)
-  Pfam_plusDesc <-  unique(Pfam_plusDesc[, 1:4 ])
-  return(Pfam_plusDesc)
-}
+# # connect to ensembl
+# # need the correct archive site 85 = jul2016.archive.ensembl.org
+# # to connect to the current database use
+# # ensBiomart <- useMart( "ensembl", dataset="drerio_gene_ensembl")
+# ensBiomart <- useMart(host='jul2016.archive.ensembl.org', biomart = "ENSEMBL_MART_ENSEMBL", dataset="drerio_gene_ensembl")
 
 chr4_specific_gene_info <- getGenesForRegion(chr4Region$chr, chr4Region$start, chr4Region$end, AllGenesInfo)
 chr4_specific_genes <- as.character( chr4_specific_gene_info$ensembl_gene_id )
@@ -2807,11 +2995,11 @@ plotExprByChr <- function( chr, start = 1, end = NULL, position = TRUE, tpm = tp
 
 # Chr 4 Expression plot
 
-```{r all_chr4_genes, include=TRUE}
+```{r chr4_genes_plot, include=TRUE}
 chr4_GeneExprList <- plotExprByChr( '4', tpm = tpmFilt )
 ```
 
-```{r chr4Expr_plus_cluster, include=TRUE}
+```{r chr4Expr_plus_cluster_col, include=TRUE}
 # figure out a colour palette including all the clusters that have more than 8 genes on chr 4.
 chr4ClusterData <- droplevels( cluster_data[ rownames(chr4_GeneExprList$tpms), c("cluster", "start") ] )
 chr4ClusterData$geneId <- factor( rownames(chr4_GeneExprList$tpms),
@@ -3189,27 +3377,6 @@ print(znf_nlr_hist)
 
 Line graph showing the distribution of ZnF and NLR genes on chromosome 4 (binwidth = 5 Mb).
 
-### Figure 4-2
-#### histograms of ZnF genes on chr 4, split by cluster
-
-```{r hist_facetted, include=TRUE}
-histxBreaks <- seq(0,80000000,20000000)
-histxLabels <- as.character( seq(0,80,20) )
-znf_cluster_hist <- ggplot( data = histData ) +
-  geom_histogram( aes( x = mid ), binwidth = 5000000, colour = "white" ) + 
-  scale_x_continuous( limits=c(0,80000000), breaks = histxBreaks, labels = histxLabels ) +
-  labs(x = 'Position (Mb)', y = "Gene Count") +
-  facet_wrap( ~ cluster ) +
-  theme_minimal()
-
-plotList <- add_to_plot_list( plotList, znf_cluster_hist, 
-                              file.path(rootPath, 'plots', 'Figure.4-2.pdf') )
-
-print(znf_cluster_hist)
-```
-
-Histogram showing the distribution of genes in clusters 4, 22, 37 and 84, split by cluster.
-
 ```{r znf_nlr_cor}
 # calc correlation matrix for nlr genes and chr4 znf genes
 # cat together the chr4 znf and nlr gene info and sort by position
@@ -3508,6 +3675,7 @@ grid.draw(
 dev.off()
 
 ```
+
 #### Regional expression
 
 ### Figure 4
@@ -3889,85 +4057,6 @@ done >> output/chr_expression_domains/chr_ex_domains.tsv
 
 ```
 
-```{r fig.4.3b-g, include=TRUE, eval=FALSE}
-selectedRegions <- list(
-  crystallins = list( chr = "9", start = 22082881, end = 22866634 ),
-  cathepsins = list( chr = "12", start = 16470000, end = 16800000 ),
-  her = list( chr = "11", start = 41354000, end = 41449985 ),
-  hist1 = list( chr = "7", start = 5408320, end = 6331233 ),
-  hist2.1 = list( chr = "25", start = 34600000, end = 34650000 ),
-  hist2.2 = list( chr = "25", start = 35760000, end = 35850000 )
-)
-
-closeUpPlotList <- lapply( selectedRegions,
-                           function( x ){ return( plotExprByChr( x$chr, x$start, x$end, position = FALSE) ) }
-                           )
-# get max value
-maxValue <- log10( max( sapply( closeUpPlotList, function(x){ return( max(x$tpms) ) } ) ) )
-
-# This function adds gene names to the heatmap
-add_gene_names <- function( closeUpInfo ){
-  geneLabels <- geneNames[ rownames(closeUpInfo$tpms) ]
-  return( closeUpInfo$plot + scale_y_discrete(labels=geneLabels) +
-            scale_fill_gradientn( limits = c(0,maxValue),
-                                colours = c("blue", "yellow", "red"),
-                                guide = guide_colorbar(title = "log10 TPM") ) +
-            theme( plot.title = element_blank() ) )
-}
-closeUpPlots <- lapply( closeUpPlotList, add_gene_names )
-
-print(closeUpPlots)
-
-figLetters <- letters[2:7]
-for( i in seq_len(length(closeUpPlots)) ){
-  pdf( file = file.path(rootPath, 'plots', paste0('Figure.4-3', figLetters[i], '.pdf') ) )
-  print(closeUpPlots[[i]])
-  dev.off()
-}
-```
-
-```{r produceGeneLists, eval=FALSE}
-genesPfamList <- lapply( selectedRegions,
-                         function(x, ensBiomart, pfamDesc){
-                           genes <- as.character( 
-                             getGenesForRegion(x$chr, x$start, x$end, AllGenesInfo)$ensembl_gene_id )
-                         return( getPfamForGenes( ensBiomart, genes, pfamDesc ) )
-                         },
-                         ensBiomart,
-                         pfamDesc
-  )
-
-# join to AllGenesInfo
-genesPfamInfo <- lapply( genesPfamList,
-                         function(x, AllGenesInfo){ 
-                           return( merge(AllGenesInfo, x, by.x = c('ensembl_gene_id'), by.y = c('ensembl_gene_id') ) )
-                         },
-                         AllGenesInfo
-  )
-
-genesPfamInfo <- lapply( genesPfamInfo,
-                         function(x){
-                           x <- x[ order( x$start_position), 
-                                      c('ensembl_gene_id', 'external_gene_name.y', 
-                                        'chromosome_name',
-                                        'start_position', 'end_position',
-                                        'pfam', 'pfamDescription') ]
-                           names(x)[ grepl("external_gene_name.y", names(x)) ] <- 'external_gene_name'
-                           return(x)
-                         }
-  )
-
-# join together chr4 znfs, 22 znfs and others and output as file
-pfamInfo <- rbind( chr4_ZnF_geneInfo,
-                   znfs_22PfamInfo,
-                   do.call('rbind', genesPfamInfo )
-)
-
-write.table(pfamInfo, file=file.path(rootPath, 'regionalExpression.PFAM.tsv'),
-            row.names = FALSE, quote = FALSE, sep=)
-
-```
-
 ## Figure 6
 ### Fig6a
 #### Pearson histogram (Paralogues)
@@ -4207,7 +4296,7 @@ highlyCor <- pairwiseCor[ pairwiseCor$CorCoeff > corThreshold & !is.na(pairwiseC
 highlyCor <- highlyCor[ order(highlyCor$CorCoeff, decreasing = TRUE), ]
 
 corThreshold <- -0.5
-genes <- pairwiseCor[ pairwiseCor$CorCoeff < corThreshold & !is.na(pairwiseCor$CorCoeff), ]
+negCor <- pairwiseCor[ pairwiseCor$CorCoeff < corThreshold & !is.na(pairwiseCor$CorCoeff), ]
 negCor <- negCor[ order(negCor$CorCoeff), ]
 
 top10_bottom10 <- rbind( highlyCor[1:10,], negCor[1:10,] )
@@ -4410,7 +4499,7 @@ write.table(tpm_gene_list,
 
 ```
 
-```{bash parse_GO_max, eval=FALSE}
+```{bash parse_GO_max}
 # Run parse_GO script on paralogues GO output
 # add local library paths
 eval $(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)
@@ -4455,9 +4544,13 @@ done >> output/topgo/cor-genes/topGOResults.sig.tsv
 ```{r pfam_domains}
 high_cor_genes_Pfam <- getPfamForGenes( ensBiomart, cor_genes_list[[2]], pfamDesc )
 write.table(high_cor_genes_Pfam, file = file.path(rootPath, 'output', 'topgo', 'cor-genes', '0.9.pfam.tsv'), quote = FALSE, sep = "\t", row.names = FALSE, col.names = TRUE)
+# Remove genes with no pfam
+high_cor_genes_Pfam <- high_cor_genes_Pfam[ high_cor_genes_Pfam$pfam != '', ]
 
 # count up numbers of genes with each pfam domain
-all_genes_pfam <- getPfamForGenes( ensBiomart, allGenes, pfamDesc )
+all_genes_pfam <- getPfamForGenes( ensBiomart, all_genes, pfamDesc )
+# Remove genes with no pfam
+all_genes_pfam <- all_genes_pfam[ all_genes_pfam$pfam != '', ]
 pfam_counts <- table(all_genes_pfam$pfam)
 
 high_cor_genes_pfam_counts <- table(high_cor_genes_Pfam$pfam)
