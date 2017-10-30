@@ -1031,43 +1031,6 @@ mv output/pca/PC* output/pca/rnaseq/
 
 #### PCA Plots (using all genes)
 
-```{r pcs1_3_plots, include=TRUE, eval=FALSE}
-# # fig.1e PC1 against 2
-# plotList <- add_to_plot_list( plotList, 
-#                               pcaPlotList[[1]] + theme( legend.position = "none" ), 
-#                               file.path(rootPath, 'plots', 'Figure.1e.pdf') )
-# print( pcaPlotList[[1]] + theme( legend.position = "none" ) )
-# 
-# # PC1 against 2, postscript
-# PlotFile <- file.path(rootPath, 'plots', 'pca.PCs1-2.ps' )
-# postscript(file=PlotFile, paper="special", width = 8, height = 8)
-# print( pcaPlotList[[1]] + theme( legend.position = "none" ) )
-# dev.off()
-# 
-# 
-# # fig.1f PC1 against 3, with legend
-# propVarPC <- pcaObj$pca$sdev^2 / sum( pcaObj$pca$sdev^2 )
-# pc1_pc3Plot <- PCA_plot( pcaObj$pca, propVarPC, 1, secondPC = 3, ddsRlog, sampleNames = NULL,
-#                          colourPalette = colourPalette, shapePalette = shapePalette)
-# plotList <- add_to_plot_list( plotList, 
-#                               pc1_pc3Plot, 
-#                               file.path(rootPath, 'plots', 'Figure.1f.pdf') )
-# print( pc1_pc3Plot )
-# 
-# # PC1 against 3
-# PlotFile <- file.path(rootPath, 'plots', 'pca.PCs1-3.ps')
-# postscript(file=PlotFile, paper="special", width = 8, height = 8)
-# print( pc1_pc3Plot + theme( legend.position = "none" ) )
-# dev.off()
-# 
-# # PC1 against 3, with legend
-# PlotFile <- file.path(rootPath, 'plots', 'pca.PCs1-3.legend.ps')
-# postscript(file=PlotFile, paper="special", width = 10, height = 8)
-# print( pc1_pc3Plot )
-# dev.off()
-
-```
-
 #### 3d plot
 
 ```{r pcaPlot3D, include=TRUE}
