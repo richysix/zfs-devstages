@@ -2056,6 +2056,21 @@ for( cluster_num in seq_len(length(clusters))){
   dev.off()
 }
 
+pdf(file = file.path(rootPath, 'plots', 'biolayout-cluster-profiles_meanTPM.pdf'))
+for( cluster_num in seq_len(length(clusters))){
+  print(ggplot(data = cluster_profile_data_list[[cluster_num]], 
+          aes(x = stage, y = mean_tpm, group = 1) ) +
+    geom_path( size = 0.5 ) +
+    labs(x = 'Stage', y = 'mean TPM') +
+    theme_minimal() +
+    theme( axis.text.x = element_blank(),
+           axis.text.y = element_text(size = 6),
+           axis.title = element_text(size = 8),
+           legend.text = element_text(size = 6),
+           legend.title = element_text(size = 8) )
+  )
+}
+dev.off()
 # # plot with sample strip
 # profile_plot <- 
 #   ggplot(data = cluster_profile_data_list[[cluster_num]], 
