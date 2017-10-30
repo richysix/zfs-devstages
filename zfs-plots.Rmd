@@ -672,20 +672,7 @@ maxBarHeight <- (ceiling(max(bin_counts$bin_size)/1000) + 0.2)*1000 # put the te
 numGenes$x = rep(midRange, nrow(numGenes) )
 numGenes$y = rep(maxBarHeight, nrow(numGenes) )
 
-genesDistPlot <- ggplot(data=meanTpmFiltByStage, aes(meanExpr) ) +
-  geom_histogram( breaks = seq(xLowLim,xHighLim,1), closed = 'right' ) +
-  geom_text( data = numGenes, aes(x, y, label=numGenes), size = 2 ) +
-  facet_wrap( ~ stage, nrow = 3, scales = "free_x" ) +
-  labs(x="Mean Expression (log2[TPM])", y="Frequency",
-       title="Distribution of gene expression by stage") +
-  theme_minimal() + 
-  theme( strip.background = element_rect(fill="grey90", colour = "white"),
-         panel.spacing.y = unit(0.5, units = 'cm'),
-         axis.text.x = element_text( size = 6, angle = 0, debug = FALSE)
-         ) + 
-  scale_x_continuous(trans = log2_trans(),
-                     labels = 
-                       function(log2breaks){
+print_log2_as_exponent <- function(log2breaks){
     log2labels <- vector('list', length = length(log2breaks))
     # log2breaks <- c(NA,-4, 3, 10, 17)
     for( i in seq_len(length(log2breaks)) ){
@@ -698,7 +685,21 @@ genesDistPlot <- ggplot(data=meanTpmFiltByStage, aes(meanExpr) ) +
     }
     # print(log2labels)
     return(log2labels)
-  } )
+}
+
+genesDistPlot <- ggplot(data=meanTpmFiltByStage, aes(meanExpr) ) +
+  geom_histogram( breaks = seq(xLowLim,xHighLim,1), closed = 'right' ) +
+  geom_text( data = numGenes, aes(x, y, label=numGenes), size = 2 ) +
+  facet_wrap( ~ stage, nrow = 3, scales = "free_x" ) +
+  labs(x="Mean Expression (log2[TPM])", y="Frequency",
+       title="Distribution of gene expression by stage") +
+  theme_minimal() + 
+  theme( strip.background = element_rect(fill="grey90", colour = "white"),
+         panel.spacing.y = unit(0.5, units = 'cm'),
+         axis.text.x = element_text( size = 6, angle = 0, debug = FALSE)
+         ) + 
+  scale_x_continuous(trans = log2_trans(),
+                     labels = print_log2_as_exponent )
 
 # print(genesDistPlot)
 ```
