@@ -1914,6 +1914,8 @@ done
 ### Undetected genes
 
 ```{r undetected_GO}
+all_genes <- do.call(c, lapply(tpmByStage, function(x){ colnames(x) } ) )
+
 # genes that are not above threshold
 undetectedGenes <- names(genesAboveThreshold)[ !genesAboveThreshold ]
 # # or genes that are all zeros
@@ -1926,7 +1928,7 @@ for( ontologyClass in c('BP', 'MF', 'CC') ){
              'maxByStage',
              paste('undetected', ontologyClass, 'topGO', sep='.')
            )
-  sigRes <- runTopGO( undetectedGenes, ontologyClass, allGenes, outputPrefix )
+  sigRes <- runTopGO( undetectedGenes, ontologyClass, all_genes, outputPrefix )
 }
 
 geneInfo <- data.frame(
@@ -1945,7 +1947,7 @@ write.table(geneInfo, file=gene_file_name,
 
 ```
 
-```{bash parse_GO_undetected, eval=FALSE}
+```{bash parse_GO_undetected}
 # Run parse_GO script on undetected GO output
 for ontology in BP CC MF
 do
@@ -4330,7 +4332,7 @@ for( i in seq_len(length(corThresholds))  ){
       'cor-genes',
       paste(threshold, ontologyClass, 'topGO', sep='.')
     )
-    sigRes <- runTopGO( cor_genes, ontologyClass, allGenes, outputPrefix, sigLevel = 0.05 )
+    sigRes <- runTopGO( cor_genes, ontologyClass, all_genes, outputPrefix, sigLevel = 0.05 )
   }
   tpm_gene_list <- data.frame(
     names = geneNames[ cor_genes ],
@@ -4357,7 +4359,7 @@ for( ontologyClass in c('BP', 'MF', 'CC') ){
     'cor-genes',
     paste(threshold, ontologyClass, 'topGO', sep='.')
   )
-  sigRes <- runTopGO( cor_genes, ontologyClass, allGenes, outputPrefix, sigLevel = 0.05 )
+  sigRes <- runTopGO( cor_genes, ontologyClass, all_genes, outputPrefix, sigLevel = 0.05 )
 }
 tpm_gene_list <- data.frame(
   names = geneNames[ cor_genes ],
@@ -4378,7 +4380,7 @@ for( ontologyClass in c('BP', 'MF', 'CC') ){
     'cor-genes',
     paste('all', ontologyClass, 'topGO', sep='.')
   )
-  sigRes <- runTopGO( cor_genes, ontologyClass, allGenes, outputPrefix, sigLevel = 0.05 )
+  sigRes <- runTopGO( cor_genes, ontologyClass, all_genes, outputPrefix, sigLevel = 0.05 )
 }
 
 tpm_gene_list <- data.frame(
@@ -4393,7 +4395,7 @@ write.table(tpm_gene_list,
 
 ```
 
-```{bash parse_GO, eval=FALSE}
+```{bash parse_GO_max, eval=FALSE}
 # Run parse_GO script on paralogues GO output
 # add local library paths
 eval $(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)
