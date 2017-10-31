@@ -34,7 +34,8 @@ id2GOList <- list()
 for( ontology in c('BP', 'CC', 'MF') ){
   mapFile <- file.path( 
     rootPath,
-    'output',
+    'dataFiles',
+    'topgo',
     paste0(code2ontology[[ontology]], '.e', ensVersion, '.map' )
   )
   id2GOList[[ontology]] <- readMappings(file = mapFile)
@@ -53,57 +54,57 @@ topgo_results_file <- file.path(rootPath, 'output/topgo/0.94-e85-fisher/topGORes
 topgo_results <- read.table(topgo_results_file, sep = "\t", header = TRUE)
 
 # collapse GO terms down to highest-level term that is unique at that level
-#collapse_GO <- function(cluster_go){
-#  subtree_sizes <- table(cluster_go$SubtreeNumber)
-#  top_unique_levels <- vector('list', length = length(subtree_sizes))
-#  i <- 1
-#  for( subtree_number in names(subtree_sizes)){
-#    subtree <- cluster_go[cluster_go$SubtreeNumber == subtree_number, ]
-#    if (subtree_sizes[subtree_number] == 1) {
-#      top_unique_levels[[i]] <- subtree
-#    }
-#    tree_levels <- table(subtree$Level)
-#    # print(tree_levels)
-#    prev_level <- NULL
-#    top_unique_level <- NULL
-#    for( level in names(tree_levels) ){
-#      if(tree_levels[[level]] > 1){
-#        if(is.null(prev_level)){
-#          cat(sprintf('Cluster: %s, Domain: %s, Subtree: %s, Level: %s\n', 
-#                      cluster_go$cluster[1], cluster_go$domain[1], 
-#                      subtree_number, tree_levels))
-#          stop('Gone too far')
-#        } else {
-#          top_unique_level <- prev_level
-#          break
-#        }
-#      } else {
-#        prev_level <- level
-#      }
-#    }
-#    if(is.null(top_unique_level)){
-#      top_unique_level <- prev_level
-#    }
-#    # cat(sprintf('Cluster: %s Domain: %s Subtree: %s TopLevel: %s\n', 
-#    #                   cluster_go$cluster[1], cluster_go$domain[1], 
-#    #                   subtree_number, top_unique_level))
-#    top_unique_levels[[i]] <- subtree[subtree$Level == top_unique_level, ]
-#    i <- i + 1
-#  }
-#  return(do.call(rbind, top_unique_levels))
-#}
-#
-#collapsed_go_results <- 
-#  do.call(rbind,
-#          lapply(split(topgo_results, topgo_results$cluster),
-#            function(cluster_subset){
-#                do.call(rbind,
-#                        lapply(split(cluster_subset, cluster_subset$domain),
-#                        collapse_GO))
-#            }
-#          )
-#  )
-#
+collapse_GO <- function(cluster_go){
+ subtree_sizes <- table(cluster_go$SubtreeNumber)
+ top_unique_levels <- vector('list', length = length(subtree_sizes))
+ i <- 1
+ for( subtree_number in names(subtree_sizes)){
+   subtree <- cluster_go[cluster_go$SubtreeNumber == subtree_number, ]
+   if (subtree_sizes[subtree_number] == 1) {
+     top_unique_levels[[i]] <- subtree
+   }
+   tree_levels <- table(subtree$Level)
+   # print(tree_levels)
+   prev_level <- NULL
+   top_unique_level <- NULL
+   for( level in names(tree_levels) ){
+     if(tree_levels[[level]] > 1){
+       if(is.null(prev_level)){
+         cat(sprintf('Cluster: %s, Domain: %s, Subtree: %s, Level: %s\n',
+                     cluster_go$cluster[1], cluster_go$domain[1],
+                     subtree_number, tree_levels))
+         stop('Gone too far')
+       } else {
+         top_unique_level <- prev_level
+         break
+       }
+     } else {
+       prev_level <- level
+     }
+   }
+   if(is.null(top_unique_level)){
+     top_unique_level <- prev_level
+   }
+   # cat(sprintf('Cluster: %s Domain: %s Subtree: %s TopLevel: %s\n',
+   #                   cluster_go$cluster[1], cluster_go$domain[1],
+   #                   subtree_number, top_unique_level))
+   top_unique_levels[[i]] <- subtree[subtree$Level == top_unique_level, ]
+   i <- i + 1
+ }
+ return(do.call(rbind, top_unique_levels))
+}
+
+collapsed_go_results <-
+ do.call(rbind,
+         lapply(split(topgo_results, topgo_results$cluster),
+           function(cluster_subset){
+               do.call(rbind,
+                       lapply(split(cluster_subset, cluster_subset$domain),
+                       collapse_GO))
+           }
+         )
+ )
+
 
 zfa_file <- file.path(rootPath, 'output', 'zfa', '0.94-e85', 'zfa.e85.sig.tsv')
 biolayout_zfa_data <- read.table(zfa_file, sep = "\t", header=TRUE, quote = "\"")
