@@ -244,7 +244,7 @@ join(q{" --colours "}, @colours ), q{" --lines} ); }' | sh > plots/sample_strip-
 
 #### Reads Mapped
 
-```{r reads_mapped_rnaseq}
+```{r reads_mapped_rnaseq, include=TRUE}
 # the data on Mapped reads comes from the QoRTs package and is present in summary table file
 # the READ_PAIR_OK category are read pairs that are properly paired and uniquely mapped
 
@@ -701,7 +701,7 @@ genesDistPlot <- ggplot(data=meanTpmFiltByStage, aes(meanExpr) ) +
   scale_x_continuous(trans = log2_trans(),
                      labels = print_log2_as_exponent )
 
-# print(genesDistPlot)
+print(genesDistPlot)
 ```
 
 ```{r tpm_dist_hist}
@@ -758,6 +758,8 @@ postscript(file.path(rootPath, 'plots', 'Fig.1b.eps'),
            width = 6, height = 5)
 print(sampleCor_spearman_heatmap)
 dev.off()
+
+print(sampleCor_spearman_heatmap)
 
 postscript(file.path(rootPath, 'plots', 'Fig.1b.no_legend.eps'),
            width = 5, height = 5)
@@ -1055,10 +1057,10 @@ rgl.postscript( filename = file.path(rootPath, 'plots', 'Figure.1d.notext.eps'),
 )
 rgl.snapshot( filename = file.path(rootPath, 'plots', 'Figure.1d.png'), 
               fmt = "png")
-par3d(op)
+#par3d(op)
 ```
 
-### PC Median Heatmaps
+### PC Heatmaps
 
 ```{r medianHeatmap, include=TRUE}
 numGenes <- 100
@@ -1142,6 +1144,7 @@ postscript(file = file.path(rootPath, 'plots', 'Figure.1e.scaled.eps'),
 print( mean_scaled_pc_tpm_Heatmap )
 dev.off()
 
+print( mean_scaled_pc_tpm_Heatmap )
 ```
 
 ### Figure S2
@@ -1573,6 +1576,7 @@ postscript( file = file.path(rootPath, 'plots', 'Fig.3a.tpm_heatmap.ps'),
 print(tpmMSHeatmap)
 dev.off()
 
+print(tpmMSHeatmap)
 ```
 
 ```{r getGeneNames}
@@ -2139,11 +2143,6 @@ dev.off()
 #            legend.text = element_text(size = 6),
 #            legend.title = element_text(size = 8) )
 
-```
-
-```{bash biolayout_go_zfa}
-# run R script to create GO/ZFA html files
-Rscript make_go_zfa_summary.R
 ```
 
 ```{r chr_by_stage}
@@ -3012,9 +3011,9 @@ for( clusterName in names(table(chr4ClusterData$cluster))[ table(chr4ClusterData
 chr4ClusterData <- droplevels(chr4ClusterData)
 ```
 
-There are `sum(table(chr4ClusterData$cluster) > 8)` clusters with more than 8 genes on chr 4. Need a colour palette for 9 clusters.
+There are `r sum(table(chr4ClusterData$cluster) > 8)` clusters with more than 8 genes on chr 4. Need a colour palette for 9 clusters.
 
-```{r set_colour_palette}
+```{r set_colour_palette_znf_clusters}
 # set everything but clusters 7, 23, 26 and 135 to black
 cluster_colour_palette <- 
   colour_blind_palette[
@@ -3080,33 +3079,6 @@ znf_cluster_ClusterTilePlot <- ggplot( data = znf_cluster_annoData, aes(x=AnnoTy
 
 ```
 
-```{r ZnF_exp_profiles, include=TRUE}
-znf_profile_data <- do.call(rbind, 
-                                 lapply(znf_cluster_numbers,
-                                        function(x){
-                                          cluster_profile_data_list[[x]] }
-                                 )
-)
-cb_palette <- colour_blind_palette[c('blue', 'vermillion', 'blue_green', 'orange')]
-names(cb_palette) <- clusterNames
-znf_clusters_profiles_plot <- 
-  ggplot(data = znf_profile_data, 
-          aes(x = stage, y = mean_tpm, group = cluster_name,
-                 colour = cluster_name) ) + 
-    geom_path( size = 1 ) +
-    scale_color_manual(values = cb_palette,
-                       guide = guide_legend(title = 'Cluster')) + 
-    labs(x = 'Stage', y = 'mean TPM') + 
-    theme_minimal() +
-    theme( axis.text.x = element_blank())
-
-postscript(file = file.path(rootPath, 'plots', 'Fig.5b.eps'),
-           width = 7, height = 5, paper = 'special', horizontal = FALSE)
-print(znf_clusters_profiles_plot)
-dev.off()
-
-```
-
 ```{r NLR_log10_tpms}
 nlrFile <- file.path(rootPath, 'dataFiles', 'rnaseq', 'NLR-ENS-GRCz10.txt')
 nlrData <- read.table(nlrFile)
@@ -3158,7 +3130,7 @@ chr4ClusterTilePlotMultiTrack <- ggplot( data = chr4ClusterData, aes(x=cluster, 
 
 ```
 
-### Fig4A
+### Fig4A - ZnF heatmap
 
 ```{r plotfig4a, include=TRUE, warning=FALSE}
 # figure out max expression level
@@ -3205,44 +3177,8 @@ dev.off()
 
 ```
 
-### Fig4C - NLR genes tpm heatmap
+### Fig4B - Chr4 tpm heatmap
 
-```{r plotfig4c, include=TRUE, warning=FALSE}
-print( nlrlogtpmsInfo$plot + scale_fill_gradientn( limits = c(0,maxValue),
-                                 colours = c("blue", "yellow", "red"),
-                                  guide = guide_colorbar(title = "log10 TPM") ) )
-
-postscript(file=file.path(rootPath, 'plots', 'Figure.4c.eps'),
-           width = 8, height = 6, horizontal = TRUE)
-print( nlrlogtpmsInfo$plot + scale_fill_gradientn( limits = c(0,maxValue),
-                                 colours = c("blue", "yellow", "red"),
-                                  guide = guide_colorbar(title = "log10 TPM") ) +
-                                  theme(legend.text = element_text(size = 12),
-                                        legend.title = element_text(size = 14)) )
-dev.off()
-```
-
-### Fig4D - Chr22 Znf genes tpm heatmap
-```{r fig4d, include=TRUE, warning=FALSE, eval=FALSE}
-# ZnF chr 22 plot
-print( znfs_22$plot + 
-         scale_fill_gradientn( limits = c(0,maxValue),
-                                colours = c("blue", "yellow", "red"),
-                                guide = guide_colorbar(title = "log10 TPM") ) +
-         theme(plot.title=element_blank()) )
-
-# plot to file
-pdf(file=file.path(rootPath, 'plots', 'Figure.4d.pdf'))
-print( znfs_22$plot + 
-         scale_fill_gradientn( limits = c(0,maxValue),
-                                colours = c("blue", "yellow", "red"),
-                                guide = guide_colorbar(title = "log10 TPM") ) +
-         theme(plot.title=element_blank()) )
-dev.off()
-
-```
-
-### Fig4E - Chr4 tpm heatmap
 ```{r chr4_plot, include=TRUE, warning=FALSE}
 grid.newpage()
 grid.draw( 
@@ -3284,7 +3220,37 @@ grid.draw(
 dev.off()
 ```
 
-### Fig4F-G - histograms of ZnF/NLR genes on chr 4
+### Fig4C - ZnF clusters expression profiles
+
+```{r ZnF_exp_profiles, include=TRUE}
+znf_profile_data <- do.call(rbind, 
+                                 lapply(znf_cluster_numbers,
+                                        function(x){
+                                          cluster_profile_data_list[[x]] }
+                                 )
+)
+cb_palette <- colour_blind_palette[c('blue', 'vermillion', 'blue_green', 'orange')]
+names(cb_palette) <- clusterNames
+znf_clusters_profiles_plot <- 
+  ggplot(data = znf_profile_data, 
+          aes(x = stage, y = mean_tpm, group = cluster_name,
+                 colour = cluster_name) ) + 
+    geom_path( size = 1 ) +
+    scale_color_manual(values = cb_palette,
+                       guide = guide_legend(title = 'Cluster')) + 
+    labs(x = 'Stage', y = 'mean TPM') + 
+    theme_minimal() +
+    theme( axis.text.x = element_blank())
+
+postscript(file = file.path(rootPath, 'plots', 'Fig.5b.eps'),
+           width = 7, height = 5, paper = 'special', horizontal = FALSE)
+print(znf_clusters_profiles_plot)
+dev.off()
+
+```
+
+### Fig4D - histograms of ZnF/NLR genes on chr 4
+
 ```{r hist, include=TRUE}
 plotData <- merge( chr4ZnFData, cluster_data, by.x = "ensembl_gene_id", by.y = "gene_id" )
 plotData$mid <- plotData$start + (plotData$end - plotData$start)/2
@@ -3376,6 +3342,46 @@ print(znf_nlr_hist)
 ```
 
 Line graph showing the distribution of ZnF and NLR genes on chromosome 4 (binwidth = 5 Mb).
+
+### Fig4E - NLR genes tpm heatmap
+
+```{r plotfig4c, include=TRUE, warning=FALSE}
+print( nlrlogtpmsInfo$plot + scale_fill_gradientn( limits = c(0,maxValue),
+                                 colours = c("blue", "yellow", "red"),
+                                  guide = guide_colorbar(title = "log10 TPM") ) )
+
+postscript(file=file.path(rootPath, 'plots', 'Figure.4c.eps'),
+           width = 8, height = 6, horizontal = TRUE)
+print( nlrlogtpmsInfo$plot + scale_fill_gradientn( limits = c(0,maxValue),
+                                 colours = c("blue", "yellow", "red"),
+                                  guide = guide_colorbar(title = "log10 TPM") ) +
+                                  theme(legend.text = element_text(size = 12),
+                                        legend.title = element_text(size = 14)) )
+dev.off()
+```
+
+#### Chr22 Znf genes tpm heatmap
+
+```{r fig4d, include=TRUE, warning=FALSE, eval=FALSE}
+# ZnF chr 22 plot
+print( znfs_22$plot + 
+         scale_fill_gradientn( limits = c(0,maxValue),
+                                colours = c("blue", "yellow", "red"),
+                                guide = guide_colorbar(title = "log10 TPM") ) +
+         theme(plot.title=element_blank()) )
+
+# plot to file
+pdf(file=file.path(rootPath, 'plots', 'Figure.4d.pdf'))
+print( znfs_22$plot + 
+         scale_fill_gradientn( limits = c(0,maxValue),
+                                colours = c("blue", "yellow", "red"),
+                                guide = guide_colorbar(title = "log10 TPM") ) +
+         theme(plot.title=element_blank()) )
+dev.off()
+
+```
+
+### Figure 4 - figure supplement 1
 
 ```{r znf_nlr_cor}
 # calc correlation matrix for nlr genes and chr4 znf genes
@@ -3678,7 +3684,7 @@ dev.off()
 
 #### Regional expression
 
-### Figure 4
+### Figure 5
 
 ```{r manhattan, include=TRUE}
 # get chr lengths for seqinfo object
@@ -3841,7 +3847,7 @@ for( i in seq_len(length(chrSpecificGeneExprPlotNoLegendList)) ){
   print(chrSpecificGeneExprPlotNoLegendList[[i]])
   dev.off()
   
-  print(chrSpecificGeneExprPlotNoLegendList[[i]])
+#  print(chrSpecificGeneExprPlotNoLegendList[[i]])
 }
 
 # print one with a legend to get the legend
@@ -4342,6 +4348,8 @@ postscript(file = file.path(rootPath, 'plots', 'Fig.6b.eps'),
            width = 3.5, height = 4, paper = 'special', horizontal = FALSE)
 print(top10_bottom10Heatmap)
 dev.off()
+
+print(top10_bottom10Heatmap)
 ```
 
 ### Fig6c-f
@@ -4363,6 +4371,7 @@ postscript(file = file.path(rootPath, 'plots', 'Fig.6c.eps'),
 print(ckm_plot)
 dev.off()
 
+print(ckm_plot)
 ```
 
 ```{r ckm_scatterplot, include=TRUE}
@@ -4381,6 +4390,7 @@ postscript(file = file.path(rootPath, 'plots', 'Fig.6d.eps'),
 print(ckm_scatterplot)
 dev.off()
 
+print(ckm_scatterplot)
 ```
 
 
@@ -4400,7 +4410,7 @@ postscript(file = file.path(rootPath, 'plots', 'Fig.6e.eps'),
 print(impdh1_plot)
 dev.off()
 
-
+print(impdh1_plot)
 ```
 
 ```{r impdh1_scatterplot, include=TRUE}
@@ -4419,6 +4429,7 @@ postscript(file = file.path(rootPath, 'plots', 'Fig.6f.eps'),
 print(impdh1_scatterplot)
 dev.off()
 
+print(impdh1_scatterplot)
 ```
 
 ```{r go_enrichment_paralogues}
@@ -4692,8 +4703,6 @@ detctSampleCorHeatmap <- ggplot(data = detctSampleCor.m) +
                         axis.text.x = element_text(colour='black', angle = 90, 
                                                    size = 0.5, hjust = 1, debug = FALSE ) )
 
-print(detctSampleCorHeatmap)
-
 # Spearman
 detctSampleCor_spearman <- cor(counts(detctDESeqDataSet, normalized=TRUE), method = 'spearman')
 # melt for ggplot
@@ -4748,8 +4757,8 @@ detctMatrixPlotList <- PCA_matrixPlot( detctPCDataList, detctpcaObj$pca,
 ```
 
 ```{r print_detct_pca, include=TRUE}
-pdf(file.path(rootPath, 'plots', 'Figure.1-4.pdf'), 
-       width = 20, height = 20)
+# pdf(file.path(rootPath, 'plots', 'Figure.1-4.pdf'), 
+#        width = 20, height = 20)
 postscript(file.path(rootPath, 'plots', 'Figure.1-4.eps'), 
        width = 20, height = 20)
 grid.newpage()
@@ -4759,6 +4768,13 @@ grid.draw(
               )
 )
 dev.off()
+
+grid.newpage()
+grid.draw( 
+  arrangeGrob( grobs = detctMatrixPlotList,
+               nrow = 6, ncol = 6
+              )
+)
 ```
 
 ```{r compare_overlap_pca_gene_contributions}
@@ -5053,12 +5069,16 @@ print(rab41_diff_isoform_plot +
 )
 dev.off()
 
-diff_iso_plot_list <- lapply(as.character(levels(tpm_by_transcripts$gene_id)),
-                             differential_isoform_plot,
-                             tpm_by_transcripts, colour_palette )
-pdf(file.path(rootPath, 'plots', 'diff-isoform.pdf'))
-print(diff_iso_plot_list)
-dev.off()
+diff_isoform_plots_file <- file.path(rootPath, 'plots', 'diff-isoform.pdf')
+if (!file.exists(diff_isoform_plots_file)) {
+  pdf(file = diff_isoform_plots_file)
+  diff_iso_plot_list <- lapply(as.character(head(levels(tpm_by_transcripts$gene_id))),
+                               function(gene){
+                                 print(differential_isoform_plot(gene, tpm_by_transcripts, colour_palette))
+                               }
+  )
+  dev.off()
+}
 
 # histogram
 isoform_counts <- as.data.frame(table(tpm_by_transcripts$gene_id))
@@ -5221,7 +5241,7 @@ mean_expr_dist <- ggplot(data=mean_expr_data) +
   theme_minimal()
 
 # postscript doesn't support semi-transparency
-pdf(file = file.path(rootPath, 'plots', 'fig7.mean_expr_dist.pdf'),
+pdf(file = file.path(rootPath, 'plots', 'Figure7-2A.mean_expr_dist.pdf'),
            height = 7, width = 7)
 print(mean_expr_dist + theme(axis.text = element_text(size = 12),
                              axis.title = element_text(size = 16),
@@ -5306,7 +5326,7 @@ new_linc_tpm_dist <- ggplot(data = mean_tpm_by_biotype) +
   theme_minimal()
 
 # postscript doesn't support semi-transparency
-pdf(file = file.path(rootPath, 'plots', 'e90_linc_tpm_dist.pdf'),
+pdf(file = file.path(rootPath, 'plots', 'Figure7-2B.e90_linc_tpm_dist.pdf'),
            height = 7, width = 7)
 print(new_linc_tpm_dist + theme(axis.text = element_text(size = 12),
                              axis.title = element_text(size = 16),
@@ -5401,185 +5421,30 @@ pdf(file = file.path(rootPath, 'plots', 'e90.new_genes.tpm_dist.pdf'))
 print(new_genes_mean_tpm_plot)
 dev.off()
 
-# get genes expressed at different tpm thresholds
-tpm_threshold <- c(1,2,4,8,16)
+# get genes expressed
+tpm_threshold <- 1
 
 stages <- c('Dome', 'Prim-5')
-expressed_logL <- vector('list', length = length(stages) )
 for( i in seq_len(length(stages)) ){
   stage <- stages[i]
   new_genes_tpm_by_gene_by_stage <- split.data.frame(t(new_genes_tpm_by_stage[[stage]]), 
                                      colnames(new_genes_tpm_by_stage[[stage]]))
-  for( tpm_threshold in c(1,2,4,8,16) ){
-    detected <- sapply(new_genes_tpm_by_gene_by_stage, 
+  detected <- sapply(new_genes_tpm_by_gene_by_stage, 
                         function(x){ all(x > tpm_threshold) })
-    not_detected <- sapply(new_genes_tpm_by_gene_by_stage, 
+  not_detected <- sapply(new_genes_tpm_by_gene_by_stage, 
                            function(x){ all(x == 0) } )
-    genes_detected <- data.frame(
-      gene_id = names(new_genes_tpm_by_gene_by_stage),
-      detection_status = factor( rep(NA, length(detected)),
-                                 levels = c('DETECTED', 'NOT DETECTED') )
-    )
-    genes_detected$detection_status[detected] <- 'DETECTED'
-    genes_detected$detection_status[not_detected] <- 'NOT DETECTED'
-    
-    write.table(genes_detected, 
-                file.path(rootPath, 'output', paste0('e90.genes_detected.', tpm_threshold, '-tpm.', stage, '.txt') ),
-                quote = FALSE, row.names = FALSE, col.names = FALSE, sep = "\t")
-  }
-}
-
-expressed <- do.call(cbind, expressed_logL)
-colnames(expressed) <- stages
-write.table(expressed, file = file.path(rootPath, 'output', 'e90.expressed.tsv'),
-            row.names = TRUE, col.names = NA, quote = FALSE, sep = "\t")
-```
-
-```{r protein_coding_stats}
-protein_coding_exon_info_file <- file.path(rootPath, 'dataFiles', '2017-09-28_e90_protein-coding_exon-info.tsv')
-protein_coding_exon_info <- read.table(protein_coding_exon_info_file, sep ="\t")
-names(protein_coding_exon_info) <- c('gene_id', 'transcript_id', 'exon_id', 'chr', 'start', 
-                                     'end', 'strand')
-
-protein_coding_exon_info$exon_size = protein_coding_exon_info$end - protein_coding_exon_info$start + 1
-mean(protein_coding_exon_info$exon_size)
-# [1] 235.2692
-median(protein_coding_exon_info$exon_size)
-# [1] 131
-
-# # plot histogram
-# ggplot(data = protein_coding_exon_info) + geom_histogram( aes(x = exon_size) )
-
-# plot histgram of exon sizes
-new_genes_L <- Reduce('|', lapply(rownames(new_genes_tpm), 
-                                  function(x){ protein_coding_exon_info$gene_id == x }) )
-new_genes_exon_info <- protein_coding_exon_info[new_genes_L, ]
-existing_genes_exon_info <- protein_coding_exon_info[!new_genes_L, ]
-
-protein_coding_exon_info$gene_type <- rep('existing', nrow(protein_coding_exon_info))
-protein_coding_exon_info$gene_type[new_genes_L] <- 'new'
-protein_coding_exon_info$gene_type <- factor(protein_coding_exon_info$gene_type,
-                                                   levels = c('new', 'existing'))
-
-mean(protein_coding_exon_info$exon_size[new_genes_L])
-mean(protein_coding_exon_info$exon_size[!new_genes_L])
-
-protein_coding_exon_size_hist <- ggplot(data = protein_coding_exon_info) + 
-  geom_histogram( aes(x = exon_size), binwidth = 100 ) + 
-  scale_x_continuous(limits = c(0,3000)) +
-  facet_wrap( ~ gene_type, scales = "free_y") +
-  geom_vline(data = mean_exons, aes(xintercept = median), colour = 'red') +
-  geom_text(data = labels,
-            aes(x = x, y = y, label = text), nudge_x = 5) + 
-  labs(x = "Number of Exons", y = "Frequency") + 
-  theme_minimal() +
-  theme( axis.text = element_text(size = 12),
-         axis.title = element_text(size = 14) )
-
-# aggregate info to transcript
-protein_coding_transcript_info <- ddply(protein_coding_exon_info, .(gene_id, transcript_id),
-                              summarise, num_exons = length(exon_id),
-                              transcript_length = sum(exon_size))
-
-# mean/median number of exons
-summary(protein_coding_transcript_info)
-
-new_genes_L <- Reduce('|', lapply(rownames(new_genes_tpm), 
-                                  function(x){ protein_coding_transcript_info$gene_id == x }) )
-new_genes_transcript_info <- protein_coding_transcript_info[new_genes_L, ]
-existing_genes_transcript_info <- protein_coding_transcript_info[!new_genes_L, ]
-
-protein_coding_transcript_info$gene_type <- rep('existing', nrow(protein_coding_transcript_info))
-protein_coding_transcript_info$gene_type[new_genes_L] <- 'new'
-protein_coding_transcript_info$gene_type <- factor(protein_coding_transcript_info$gene_type,
-                                                   levels = c('new', 'existing'))
-
-# plot histograms of num exons and transcript length
-mean_exons <- mean(protein_coding_transcript_info$num_exons)
-median_exons <- median(protein_coding_transcript_info$num_exons)
-average_labels <- data.frame(
-  x = as.numeric( c(median_exons, 10) ),
-  y = c(2300, 2300),
-  text = as.character(c(median_exons, sprintf('mean = %.2f', mean_exons)))
-)
-
-median_exons <- ddply(protein_coding_transcript_info, .(gene_type),
-                    summarise, mean = mean(num_exons),
-                    median = median(num_exons)
-)
-
-labels <- data.frame(
-  gene_type = rep(median_exons$gene_type, 2),
-  text = c(sprintf('median = %.0f', median_exons$median),
-           sprintf('mean = %.2f', median_exons$mean)),
-  x = c(median_exons$median, median_exons$mean + 30),
-  y = rep(c(50, 5600), 2)
-)
-
-protein_coding_num_exons_hist <- ggplot(data = protein_coding_transcript_info) + 
-  geom_histogram( aes(x = num_exons), binwidth = 1 ) + 
-  scale_x_continuous(limits = c(0,50)) +
-  facet_wrap( ~ gene_type, scales = "free_y") +
-  geom_vline(data = mean_exons, aes(xintercept = median), colour = 'red') +
-  geom_text(data = labels,
-            aes(x = x, y = y, label = text), nudge_x = 5) + 
-  labs(x = "Number of Exons", y = "Frequency") + 
-  theme_minimal() +
-  theme( axis.text = element_text(size = 12),
-         axis.title = element_text(size = 14) )
-
-postscript(file = file.path(rootPath, 'plots', 'fig7.num_exons-protein_coding.histogram.eps'),
-           width = 10, height = 7)
-print(protein_coding_num_exons_hist)
-dev.off()
-
-# histogram of transcript length
-mean_length <- mean(protein_coding_transcript_info$transcript_length)
-median_length <- median(protein_coding_transcript_info$transcript_length)
-average_labels <- data.frame(
-  x = as.numeric( c(median_length, 5000) ),
-  y = c(410, 410),
-  text = as.character(c(median_length, sprintf('mean = %.0f nt', mean_length)))
-)
-protein_coding_length_hist <- ggplot(data = protein_coding_transcript_info) + 
-  geom_histogram( aes(x = transcript_length), binwidth = 100 ) +
-  geom_vline(xintercept = median_length, colour = 'red') +
-  geom_text(data = average_labels, 
-            aes(x = x, y = y, label = text), colour = c('red', 'black'), nudge_x = 400) +
-  scale_x_continuous( limits = c(0,7000)) + 
-  labs(x = 'Transcript Length', y = 'Frequency') + 
-  theme_minimal() +
-  theme( axis.text = element_text(size = 12),
-         axis.title = element_text(size = 14) )
-
-postscript(file = file.path(rootPath, 'plots', 'fig7.length.histogram.eps'),
-           width = 7, height = 7)
-print(protein_coding_length_hist)
-dev.off()
-
-```
-
-```{r}
-# connect to e90 biomart
-e90_ensBiomart <- useMart( "ensembl", dataset="drerio_gene_ensembl")
-
-species_list <- c('hsapiens', 'mmusculus', 'rnorvegicus',
-             'amexicanus', 'gmorhua', 'trubripes','olatipes',
-             'gaculeatus', 'tnigroviridis')
-
-e90_lca_info <- get_largest_phylum(rownames(new_genes_tpm), species_list, e90_ensBiomart) 
-
-table(e90_lca_info$phylum)
-
-# get paralogues
-danio_paralogues <- getBM( 
-    filters = "ensembl_gene_id",
-    attributes = c('ensembl_gene_id',
-      'drerio_paralog_subtype'
-    ),
-    values = rownames(new_genes_tpm),
-    mart = e90_ensBiomart
+  genes_detected <- data.frame(
+    gene_id = names(new_genes_tpm_by_gene_by_stage),
+    detection_status = factor( rep(NA, length(detected)),
+                               levels = c('DETECTED', 'NOT DETECTED') )
   )
+  genes_detected$detection_status[detected] <- 'DETECTED'
+  genes_detected$detection_status[not_detected] <- 'NOT DETECTED'
+  
+  write.table(genes_detected, 
+              file.path(rootPath, 'output', paste0('e90.genes_detected.', tpm_threshold, '-tpm.', stage, '.txt') ),
+              quote = FALSE, row.names = FALSE, col.names = FALSE, sep = "\t")
+}
 
 ```
 
@@ -5596,7 +5461,7 @@ median(linc_exon_info$exon_size)
 # [1] 167
 
 # plot histogram
-ggplot(data = linc_exon_info) + geom_histogram( aes(x = exon_size) )
+# ggplot(data = linc_exon_info) + geom_histogram( aes(x = exon_size) )
 
 # aggregate info to transcript
 linc_transcript_info <- ddply(linc_exon_info, .(gene_id, transcript_id),
@@ -5625,7 +5490,7 @@ linc_num_exons_hist <- ggplot(data = linc_transcript_info) +
   theme( axis.text = element_text(size = 12),
          axis.title = element_text(size = 14) )
 
-postscript(file = file.path(rootPath, 'plots', 'fig7.num_exons.histogram.eps'),
+postscript(file = file.path(rootPath, 'plots', 'Figure7G.num_exons.histogram.eps'),
            width = 7, height = 7)
 print(linc_num_exons_hist)
 dev.off()
@@ -5649,19 +5514,11 @@ linc_length_hist <- ggplot(data = linc_transcript_info) +
   theme( axis.text = element_text(size = 12),
          axis.title = element_text(size = 14) )
 
-postscript(file = file.path(rootPath, 'plots', 'fig7.length.histogram.eps'),
+postscript(file = file.path(rootPath, 'plots', 'Figure7F.length.histogram.eps'),
            width = 7, height = 7)
 print(linc_length_hist)
 dev.off()
 
-```
-
-```{r print_plots_to_file, eval=FALSE}
-for( plotInfo in plotList ){
-  pdf(file=plotInfo$file)
-  print(plotInfo$plot)
-  dev.off()
-}
 ```
 
 ## Session Info
