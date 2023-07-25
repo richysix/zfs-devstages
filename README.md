@@ -1,4 +1,4 @@
-Notes to recreate the analysis in White et al. 2017
+Notes to recreate the analysis in [White et al. 2017](https://doi.org/10.7554/eLife.30860)
 
 ### Contents
 * GO-biolayout.md    Notes on running topGO on the gene clusters created using
