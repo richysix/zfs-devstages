@@ -17,3 +17,7 @@ This needs to be named zfs-rnaseq-grcz10.tsv and put in the dataFiles/rnaseq/ di
 * DeTCT count data  
 Download from [Figshare](https://doi.org/10.6084/m9.figshare.4622311)  
 This needs to be named zfs-detct-grcz10.tsv and put in the dataFiles/detct/ directory
+
+## Update
+
+The RNA-seq data has been remapped to GRCz11 and counted against the Ensembl v111 annotation. Count files are available for download at [Figshare](https://doi.org/10.6084/m9.figshare.25858966)
